@@ -145,6 +145,7 @@
     <ClInclude Include="IsInbound.h" />
     <ClInclude Include="LogoCore.h" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="Tokenizer.h" />
     <ClInclude Include="Turtle.h" />
   </ItemGroup>
   <ItemGroup>
@@ -157,6 +158,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="Tokenizer.cpp" />
     <ClCompile Include="Turtle.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
