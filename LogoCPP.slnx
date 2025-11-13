@@ -3,6 +3,6 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
-  <Project Path="LogoCore/LogoCore.vcxproj" />
-  <Project Path="LogoCPP/LogoCPP.vcxproj" />
+  <Project Path="LogoCore/LogoCore.vcxproj" Id="31d7b1de-00f1-4ebf-96ce-c8092ed1279f" />
+  <Project Path="LogoCPP/LogoCPP.vcxproj" Id="20a540a3-7fa3-4197-9cab-f75c7115077c" />
 </Solution>
