@@ -2,6 +2,9 @@
 class Canvas {
 public:
     Canvas(int width, int height);
-    void clear();
-    void setPixel(int x, int y);
+    void setPixel(int x, int y, char c);
+private:
+    int width;
+    int height;
+    char** grid;
 };
