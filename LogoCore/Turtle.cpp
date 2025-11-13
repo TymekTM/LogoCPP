@@ -14,75 +14,112 @@ Turtle::Turtle(Instruction& instruction, Canvas& canvas, char pen)
 
 	void Turtle::Forward(int distance)
 	{
-		if (IsInbound(posX, posY, canvas.width, canvas.height)) {
-			if (distance <= 0) return;
-			int normalized_angle = (angle % 360 + 360) % 360;
-			switch (normalized_angle) {
-			case 0:
-				for (int i = 0; i < distance; ++i) {
-					canvas.setPixel(posX + i, posY, pen);
-				}
-				posX += distance;
-				break;
-			case 90:
-				for (int i = 0; i < distance; ++i) {
-					canvas.setPixel(posX, posY - i, pen);
-				}
-				posY -= distance;
-				break;
-			case 180:
-				for (int i = 0; i < distance; ++i) {
-					canvas.setPixel(posX - i, posY, pen);
-				}
-				posX -= distance;
-				break;
-			case 270:
-				for (int i = 0; i < distance; ++i) {
-					canvas.setPixel(posX, posY + i, pen);
-				}
-				posY += distance;
-				break;
-			}
-		}
-		else {
-
-		}
-		
-	}
-	void Turtle::Backward(int distance)
-	{
-		if (IsInbound(posX, posY, canvas.width, canvas.height)) {
-			if (distance <= 0) return;
-			int normalized_angle = (angle % 360 + 360) % 360;
-			switch (normalized_angle) {
-				case 0:
-					for (int i = 0; i < distance; ++i) {
-						canvas.setPixel(posX - i, posY, pen);
-					}
-					posX -= distance;
-					break;
-				case 90:
-					for (int i = 0; i < distance; ++i) {
-						canvas.setPixel(posX, posY + i, pen);
-					}
-					posY += distance;
-					break;
-				case 180:
+		if (distance <= 0) return;
+		int normalized_angle = (angle % 360 + 360) % 360;
+		switch (normalized_angle) {
+		case 0:
+				if (IsInbound(posX + distance, posY, canvas.width, canvas.height)) {
 					for (int i = 0; i < distance; ++i) {
 						canvas.setPixel(posX + i, posY, pen);
 					}
 					posX += distance;
 					break;
-				case 270:
+				}
+				else{
+					// TODO: Handle out of bounds
+					break;
+				}
+		case 90:
+				if (IsInbound(posX, posY - distance, canvas.width, canvas.height)) {
 					for (int i = 0; i < distance; ++i) {
 						canvas.setPixel(posX, posY - i, pen);
 					}
 					posY -= distance;
 					break;
+				}
+				else {
+					// TODO: Handle out of bounds
+					break;
+				}
+		case 180:
+				if (IsInbound(posX - distance, posY, canvas.width, canvas.height)) {
+					for (int i = 0; i < distance; ++i) {
+						canvas.setPixel(posX - i, posY, pen);
+					}
+					posX -= distance;
+					break;
+				}
+				else {
+					// TODO: Handle out of bounds
+					break;
+				}
+		case 270:
+				if (IsInbound(posX, posY + distance, canvas.width, canvas.height)) {
+					for (int i = 0; i < distance; ++i) {
+						canvas.setPixel(posX, posY + i, pen);
+					}
+					posY += distance;
+					break;
+				}
+				else {
+					// TODO: Handle out of bounds
+					break;
+				}
 			}
 		}
-		else {
-
+	void Turtle::Backward(int distance)
+	{
+		if (distance <= 0) return;
+		int normalized_angle = (angle % 360 + 360) % 360;
+		switch (normalized_angle) {
+			case 0:
+					if (IsInbound(posX - distance, posY, canvas.width, canvas.height)) {
+						for (int i = 0; i < distance; ++i) {
+							canvas.setPixel(posX - i, posY, pen);
+						}
+						posX -= distance;
+						break;
+					}
+					else {
+						// TODO: Handle out of bounds
+						break;
+					}
+			case 90:
+					if (IsInbound(posX, posY + distance, canvas.width, canvas.height)) {
+						for (int i = 0; i < distance; ++i) {
+							canvas.setPixel(posX, posY + i, pen);
+						}
+						posY += distance;
+						break;
+					}
+					else {
+						// TODO: Handle out of bounds
+						break;
+					}
+			case 180:
+					if (IsInbound(posX + distance, posY, canvas.width, canvas.height)) {
+						for (int i = 0; i < distance; ++i) {
+							canvas.setPixel(posX + i, posY, pen);
+						}
+						posX += distance;
+						break;
+					}
+					else {
+						// TODO: Handle out of bounds
+						break;
+					}
+			case 270:
+					if (IsInbound(posX, posY - distance, canvas.width, canvas.height)) {
+						for (int i = 0; i < distance; ++i) {
+							canvas.setPixel(posX, posY - i, pen);
+						}
+						posY -= distance;
+						break;
+					}
+					else {
+						// TODO: Handle out of bounds
+						break;
+					}
 		}
 	}
 	void Turtle::Left(int angle)
