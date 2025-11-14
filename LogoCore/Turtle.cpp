@@ -4,8 +4,8 @@
 #include "Canvas.h"
 #include "IsInbound.h"
 
-Turtle::Turtle(Instruction& instruction, Canvas& canvas, char pen)
-    : instruction(instruction), canvas(canvas), pen(pen)
+Turtle::Turtle(Canvas& canvas, char pen)
+    :canvas(canvas), pen(pen)
 {
 
 	// Œrodek p³ótna, pozycja startowa ¿ó³wia
