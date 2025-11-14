@@ -9,16 +9,6 @@
 #include "Turtle.h"
 #include "Canvas.h"
 
-// TODO: To jest przykład funkcji biblioteki
-void fnLogoCore()
-{
-}
-
-void LogoCoreTest()
-{
-    std::cout << "Biblioteka LogoCore dodana i dziala!" << std::endl;
-}
-
 char** TurtleInstructions(std::string instructions, int width, int height, char pen)
 {
 	Canvas canvas(width, height);
