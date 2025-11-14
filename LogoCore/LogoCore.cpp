@@ -7,6 +7,7 @@
 #include "LogoCore.h"
 #include "InstructionHandler.h"
 #include "Turtle.h"
+#include "Canvas.h"
 
 // TODO: To jest przykład funkcji biblioteki
 void fnLogoCore()
@@ -18,15 +19,13 @@ void LogoCoreTest()
     std::cout << "Biblioteka LogoCore dodana i dziala!" << std::endl;
 }
 
-char** TurtleInstructions(std::string instructions, int width, int hight, char pen)
+char** TurtleInstructions(std::string instructions, int width, int height, char pen)
 {
-	Canvas canvas(width, hight);
-
-	Turtle turtle(*(new Instruction()), canvas, pen);
-
-    Instruction instructionHandler;
+	Canvas canvas(width, height);
+	Turtle turtle(canvas, pen);
+    Instruction instructionHandler(turtle);
+    
     instructionHandler.Instrucions(&instructions);
 
-    char** result = new char* [1];
-    return result;
+    return canvas.getGrid();
 }

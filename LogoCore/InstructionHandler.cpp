@@ -3,6 +3,11 @@
 #include "Tokenizer.h"
 #include "Turtle.h"
 
+Instruction::Instruction(Turtle& turtle)
+    : turtle(turtle)
+{
+}
+
 void Instruction::Instrucions(string* instructionSet)
 {
 	Tokenizer tokenizer;
@@ -13,7 +18,6 @@ void Instruction::Instrucions(string* instructionSet)
 
 void Instruction::HandleInstruction(string instruction)
 {
-	Turtle turtle(*this, *(new Canvas(100, 100)), '*');
 	switch (instruction[0]) {
 		case "Forward"[0]: {
 			turtle.Forward(std::stoi(Tokenizer().ExtractData(instruction)));
@@ -32,7 +36,6 @@ void Instruction::HandleInstruction(string instruction)
 			break;
 		}
 	}
-
 }
 
 
