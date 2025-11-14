@@ -125,11 +125,11 @@ Turtle::Turtle(Canvas& canvas, char pen)
 	}
 	void Turtle::Left(int angle)
 	{
-		angle -= angle;
+		this->angle -= angle;
 	}
 	void Turtle::Right(int angle)
 	{
-		angle += angle;
+		this->angle += angle;
 	}
 
 
