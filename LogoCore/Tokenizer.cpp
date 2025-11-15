@@ -9,13 +9,11 @@ static std::string trim(const std::string& s) {
         std::isspace(static_cast<unsigned char>(s[start]))) {
         ++start;
     }
-
     size_t end = s.size();
     while (end > start &&
         std::isspace(static_cast<unsigned char>(s[end - 1]))) {
         --end;
     }
-
     return s.substr(start, end - start);
 }
 
@@ -71,3 +69,16 @@ std::string Tokenizer::ExtractData(const std::string& input) {
     }
     return "";
 }
+
+std::string Tokenizer::ExtractCommand(const std::string& input) {
+    std::string command;
+    
+    for (size_t i = 0; i < input.size(); i++) {
+        if (input[i] == '(') {
+            return trim(command);
+        }
+        command += input[i];
+    }
+    return trim(command);
+}
+

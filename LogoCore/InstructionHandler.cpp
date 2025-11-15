@@ -18,24 +18,29 @@ void Instruction::Instrucions(string* instructionSet)
 
 void Instruction::HandleInstruction(string instruction)
 {
-	switch (instruction[0]) {
-		case "Forward"[0]: {
-			turtle.Forward(std::stoi(Tokenizer().ExtractData(instruction)));
-			break;
-		}
-		case "Backward"[0]: {
-			turtle.Backward(std::stoi(Tokenizer().ExtractData(instruction)));
-			break;
-		}
-		case "Left"[0]: {
-			turtle.Left(std::stoi(Tokenizer().ExtractData(instruction)));
-			break;
-		}
-		case "Right"[0]: {
-			turtle.Right(std::stoi(Tokenizer().ExtractData(instruction)));
-			break;
-		}
-	}
+	std::string command = Tokenizer().ExtractCommand(instruction);
+
+    std::string dataStr = Tokenizer().ExtractData(instruction);
+    int data = std::stoi(dataStr);
+
+    if (command == "Forward" || command == "forward") {
+        turtle.Forward(data);
+    }
+    else if (command == "Backward" || command == "backward") {
+        turtle.Backward(data);
+    }
+    else if (command == "Left" || command == "left") {
+        turtle.Left(data);
+    }
+    else if (command == "Right" || command == "right") {
+        turtle.Right(data);
+    }
+    else if (command == "def") {
+
+    }
+    else if (command == "var") {
+
+    }
 }
 
 

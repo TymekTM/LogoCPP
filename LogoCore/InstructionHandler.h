@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include <map>
 
 class Turtle; 
 
@@ -13,4 +14,6 @@ class Instruction {
     
     private:
     Turtle& turtle;
+    std::map<string, int> variables;
+	std::map<string, string> procedures;
 };
