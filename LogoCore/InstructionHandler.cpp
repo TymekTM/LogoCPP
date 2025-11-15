@@ -39,7 +39,7 @@ void Instruction::HandleInstruction(string instruction)
 
     }
     else if (command == "var") {
-
+		variables.merge(Tokenizer().VariableHandler(instruction));
     }
 }
 

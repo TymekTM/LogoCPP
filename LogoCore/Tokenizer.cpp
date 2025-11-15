@@ -2,6 +2,7 @@
 #include "Tokenizer.h"
 #include <string>
 #include <cctype>
+#include <map>
 
 static std::string trim(const std::string& s) {
     size_t start = 0;
@@ -80,5 +81,15 @@ std::string Tokenizer::ExtractCommand(const std::string& input) {
         command += input[i];
     }
     return trim(command);
+}
+
+std::map<std::string,int> Tokenizer::VariableHandler(const std::string& input) {
+	std::string var = trim(input.substr(input.find("var") + 3));
+	
+	std::string varName = var.substr(0, var.find('='));
+
+	int varValue = std::stoi(var.substr(var.find('=') + 1));
+
+    return { {varName, varValue} };
 }
 
