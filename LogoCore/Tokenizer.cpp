@@ -3,6 +3,7 @@
 #include <string>
 #include <cctype>
 #include <map>
+#include "InstructionHandler.h"
 
 static std::string trim(const std::string& s) {
     size_t start = 0;
@@ -53,7 +54,7 @@ std::vector<std::string> Tokenizer::Tokenize(const std::string& input) {
     return commands;
 }
 
-std::string Tokenizer::ExtractData(const std::string& input) {
+std::string Tokenizer::ExtractData(const std::string& input, std::map<std::string,int> variables) {
     std::string data;
     
     for (size_t i = 0; i < input.size(); i++) {
@@ -61,8 +62,15 @@ std::string Tokenizer::ExtractData(const std::string& input) {
 
             for (size_t j = i + 1; j < input.size(); j++) {
                 if (input[j] == ')') {
-
-                    return trim(data);
+					
+					auto it = variables.find(data);
+                    if (it != variables.end()) {
+                        int modified = it->second;
+						return std::to_string(modified);
+                    }
+                    else {
+						return trim(data);
+                    }
                 }
                 data += input[j];
             }
@@ -73,23 +81,37 @@ std::string Tokenizer::ExtractData(const std::string& input) {
 
 std::string Tokenizer::ExtractCommand(const std::string& input) {
     std::string command;
+    std::string t = trim(input);
     
-    for (size_t i = 0; i < input.size(); i++) {
-        if (input[i] == '(') {
-            return trim(command);
-        }
-        command += input[i];
+
+    if (t.find('=') != std::string::npos && t.find('(') == std::string::npos) {
+        return "var";
     }
-    return trim(command);
+    else {
+        for (size_t i = 0; i < t.size(); i++) {
+            if (t[i] == '(') {
+                return trim(command);
+            }
+            command += t[i];
+        }
+        return trim(command);
+    }
 }
 
 std::map<std::string,int> Tokenizer::VariableHandler(const std::string& input) {
-	std::string var = trim(input.substr(input.find("var") + 3));
+	std::string trimmedInput = trim(input);
+
+	size_t equalPos = trimmedInput.find('=');
+	if (equalPos == std::string::npos) {
+		return {};
+	}
+
+	std::string varName = trim(trimmedInput.substr(0, equalPos));
 	
-	std::string varName = var.substr(0, var.find('='));
 
-	int varValue = std::stoi(var.substr(var.find('=') + 1));
-
-    return { {varName, varValue} };
+	std::string varValueStr = trim(trimmedInput.substr(equalPos + 1));
+	
+	
+	int varValue = std::stoi(varValueStr);
+	return { {varName, varValue} };
 }
-

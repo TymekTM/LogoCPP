@@ -3,7 +3,7 @@
 
 int main() {
 
-    char** result = TurtleInstructions("Forward(10); Right(90); Forward(10); Right(90);  Forward(10); Right(90);              Forward(10);");
+    char** result = TurtleInstructions("x = 10; Forward(10); Right(90); Forward(10); Right(90);  Forward(10); Right(90);              Forward(x);");
     
     for (int i = 0; i < 25; ++i) {
         for (int j = 0; j < 25; ++j) {
