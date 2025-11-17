@@ -9,6 +9,7 @@ public:
 	std::string ExtractData(const std::string& input, std::map<std::string, int> variables);
 	std::string ExtractCommand(const std::string& input);
 	std::map<std::string, int> VariableHandler(const std::string& input);
+	int ArithmericHandler(const std::string& input, std::map<std::string, int> variables);
 
 private:
 	std::map<std::string, int> variables;

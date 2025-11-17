@@ -115,3 +115,73 @@ std::map<std::string,int> Tokenizer::VariableHandler(const std::string& input) {
 	int varValue = std::stoi(varValueStr);
 	return { {varName, varValue} };
 }
+
+//TO DO: OPTIMISE
+int Tokenizer::ArithmericHandler(const std::string& input, std::map<std::string, int> variables) {
+    for (size_t i = 0; i < input.size(); i++) {
+        if (input[i] == '+') {
+            std::string left, right;
+            for (size_t j = 0; j < i; j++) {
+                left += input[j];
+            }
+            for (size_t j = i + 1; j < input.size(); j++) {
+                right += input[j];
+            }
+            left = trim(left);
+            right = trim(right);
+
+            try {
+                int leftValue = std::stoi(left);
+                int rightValue = std::stoi(right);
+                return leftValue + rightValue;
+            }
+            catch (const std::exception&){
+				// TO DO: Handle variables and errors
+				return 0;
+            }
+
+        }
+        else if(input[i] == '-') {
+            std::string left, right;
+            for (size_t j = 0; j < i; j++) {
+                left += input[j];
+            }
+            for (size_t j = i + 1; j < input.size(); j++) {
+                right += input[j];
+            }
+            left = trim(left);
+            right = trim(right);
+
+            try {
+                int leftValue = std::stoi(left);
+                int rightValue = std::stoi(right);
+                return leftValue - rightValue;
+            }
+            catch (const std::exception&) {
+                // TO DO: Handle variables and errors
+                return 0;
+            }
+		}
+        else if (input[i] == '*') {
+            std::string left, right;
+            for (size_t j = 0; j < i; j++) {
+                left += input[j];
+            }
+            for (size_t j = i + 1; j < input.size(); j++) {
+                right += input[j];
+            }
+            left = trim(left);
+            right = trim(right);
+
+            try {
+                int leftValue = std::stoi(left);
+                int rightValue = std::stoi(right);
+                return leftValue * rightValue;
+            }
+            catch (const std::exception&) {
+                // TO DO: Handle variables and errors
+                return 0;
+            }
+        }
+    }
+}
