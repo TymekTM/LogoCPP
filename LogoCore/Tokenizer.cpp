@@ -66,9 +66,16 @@ std::string Tokenizer::ExtractData(const std::string& input, std::map<std::strin
 					auto it = variables.find(data);
                     if (it != variables.end()) {
                         int modified = it->second;
+						if (IsArithmetic(data)) {
+                            modified = ArithmericHandler(data, variables);
+                        }
 						return std::to_string(modified);
                     }
                     else {
+						if (IsArithmetic(data)) {
+                            int result = ArithmericHandler(data, variables);
+                            return std::to_string(result);
+                        }
 						return trim(data);
                     }
                 }
@@ -116,6 +123,15 @@ std::map<std::string,int> Tokenizer::VariableHandler(const std::string& input) {
 	return { {varName, varValue} };
 }
 
+bool Tokenizer::IsArithmetic(const std::string& input) {
+    if (input.find('+') != std::string::npos ||
+        input.find('-') != std::string::npos ||
+        input.find('*') != std::string::npos) {
+        return true;
+	}
+    else return false;
+}
+
 //TO DO: OPTIMISE
 int Tokenizer::ArithmericHandler(const std::string& input, std::map<std::string, int> variables) {
     for (size_t i = 0; i < input.size(); i++) {
@@ -130,14 +146,39 @@ int Tokenizer::ArithmericHandler(const std::string& input, std::map<std::string,
             left = trim(left);
             right = trim(right);
 
+            int leftValue = 0;
+            int rightValue = 0;
+
+
             try {
                 int leftValue = std::stoi(left);
                 int rightValue = std::stoi(right);
                 return leftValue + rightValue;
             }
-            catch (const std::exception&){
-				// TO DO: Handle variables and errors
-				return 0;
+            catch (const std::exception&) {
+                auto it = variables.find(left);
+                if (it != variables.end()) {
+                    leftValue = it->second;
+                }
+                else {
+
+                    return 0; 
+                }
+            }
+
+
+            try {
+                rightValue = std::stoi(right);
+            }
+            catch (const std::exception&) {
+                auto it = variables.find(right);
+                if (it != variables.end()) {
+                    rightValue = it->second;
+                }
+                else {
+
+                    return 0; 
+                }
             }
 
         }
@@ -152,15 +193,37 @@ int Tokenizer::ArithmericHandler(const std::string& input, std::map<std::string,
             left = trim(left);
             right = trim(right);
 
+            int leftValue = 0;
+            int rightValue = 0;
+
+
             try {
-                int leftValue = std::stoi(left);
-                int rightValue = std::stoi(right);
-                return leftValue - rightValue;
+                leftValue = std::stoi(left);
             }
             catch (const std::exception&) {
-                // TO DO: Handle variables and errors
-                return 0;
+                auto it = variables.find(left);
+                if (it != variables.end()) {
+                    leftValue = it->second;
+                }
+                else {
+                    return 0;
+                }
             }
+
+
+            try {
+                rightValue = std::stoi(right);
+            }
+            catch (const std::exception&) {
+                auto it = variables.find(right);
+                if (it != variables.end()) {
+                    rightValue = it->second;
+                }
+                else {
+                    return 0; 
+                }
+            }
+            return leftValue - rightValue;
 		}
         else if (input[i] == '*') {
             std::string left, right;
@@ -173,15 +236,38 @@ int Tokenizer::ArithmericHandler(const std::string& input, std::map<std::string,
             left = trim(left);
             right = trim(right);
 
+            int leftValue = 0;
+            int rightValue = 0;
+
+
             try {
-                int leftValue = std::stoi(left);
-                int rightValue = std::stoi(right);
-                return leftValue * rightValue;
+                leftValue = std::stoi(left);
             }
             catch (const std::exception&) {
-                // TO DO: Handle variables and errors
-                return 0;
+                auto it = variables.find(left);
+                if (it != variables.end()) {
+                    leftValue = it->second;
+                }
+                else {
+                    return 0; 
+                }
             }
+
+
+            try {
+                rightValue = std::stoi(right);
+            }
+            catch (const std::exception&) {
+                auto it = variables.find(right);
+                if (it != variables.end()) {
+                    rightValue = it->second;
+                }
+                else {
+                    return 0; 
+                }
+            }
+            return leftValue * rightValue;
         }
     }
+    return 0;
 }
