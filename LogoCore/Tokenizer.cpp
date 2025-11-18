@@ -132,7 +132,7 @@ bool Tokenizer::IsArithmetic(const std::string& input) {
     else return false;
 }
 
-//TO DO: OPTIMISE
+//TO DO: BOTH, VERY REPETETIVE CODE, OPTIMIZE, SAME HELPER FUNCTION FOR BOTH
 int Tokenizer::ArithmericHandler(const std::string& input, std::map<std::string, int> variables) {
     for (size_t i = 0; i < input.size(); i++) {
         if (input[i] == '+') {
@@ -270,4 +270,229 @@ int Tokenizer::ArithmericHandler(const std::string& input, std::map<std::string,
         }
     }
     return 0;
+}
+
+bool isLogicalOperator(char c) {
+    return c == '>' || c == '<' || c == '==' || c == '<>';
+}
+
+bool LogicHandler(const std::string& input, std::map<std::string, int> variables) {
+    for (size_t i = 0; i < input.size(); i++) {
+        if (input[i] == '>') {
+            std::string left, right;
+            for (size_t j = 0; j < i; j++) {
+                left += input[j];
+            }
+            for (size_t j = i + 1; j < input.size(); j++) {
+                right += input[j];
+            }
+            left = trim(left);
+            right = trim(right);
+
+            int leftValue = 0;
+            int rightValue = 0;
+
+
+            try {
+                int leftValue = std::stoi(left);
+                int rightValue = std::stoi(right);
+                if (leftValue > rightValue) {
+                    return true;
+                }
+                else {
+                    return false;
+                }
+            }
+            catch (const std::exception&) {
+                auto it = variables.find(left);
+                if (it != variables.end()) {
+                    leftValue = it->second;
+                }
+                else {
+                    return false;
+                }
+
+                try {
+                    rightValue = std::stoi(right);
+                }
+                catch (const std::exception&) {
+                    auto it = variables.find(right);
+                    if (it != variables.end()) {
+                        rightValue = it->second;
+                    }
+                    else {
+                        return false;
+                    }
+                }
+                if (leftValue > rightValue) {
+                    return true;
+                }
+                else {
+                    return false;
+                }
+            }
+        }
+        if (input[i] == '<') {
+            std::string left, right;
+            for (size_t j = 0; j < i; j++) {
+                left += input[j];
+            }
+            for (size_t j = i + 1; j < input.size(); j++) {
+                right += input[j];
+            }
+            left = trim(left);
+            right = trim(right);
+
+            int leftValue = 0;
+            int rightValue = 0;
+
+
+            try {
+                int leftValue = std::stoi(left);
+                int rightValue = std::stoi(right);
+                if (leftValue < rightValue) {
+                    return true;
+                }
+                else {
+                    return false;
+                }
+            }
+            catch (const std::exception&) {
+                auto it = variables.find(left);
+                if (it != variables.end()) {
+                    leftValue = it->second;
+                }
+                else {
+                    return false;
+                }
+
+                try {
+                    rightValue = std::stoi(right);
+                }
+                catch (const std::exception&) {
+                    auto it = variables.find(right);
+                    if (it != variables.end()) {
+                        rightValue = it->second;
+                    }
+                    else {
+                        return false;
+                    }
+                }
+                if (leftValue > rightValue) {
+                    return true;
+                }
+                else {
+                    return false;
+                }
+            }
+        }
+        if (input[i] == '==') {
+            std::string left, right;
+            for (size_t j = 0; j < i; j++) {
+                left += input[j];
+            }
+            for (size_t j = i + 1; j < input.size(); j++) {
+                right += input[j];
+            }
+            left = trim(left);
+            right = trim(right);
+
+            int leftValue = 0;
+            int rightValue = 0;
+
+
+            try {
+                int leftValue = std::stoi(left);
+                int rightValue = std::stoi(right);
+                if (leftValue == rightValue) {
+                    return true;
+                }
+                else {
+                    return false;
+                }
+            }
+            catch (const std::exception&) {
+                auto it = variables.find(left);
+                if (it != variables.end()) {
+                    leftValue = it->second;
+                }
+                else {
+                    return false;
+                }
+
+                try {
+                    rightValue = std::stoi(right);
+                }
+                catch (const std::exception&) {
+                    auto it = variables.find(right);
+                    if (it != variables.end()) {
+                        rightValue = it->second;
+                    }
+                    else {
+                        return false;
+                    }
+                }
+                if (leftValue > rightValue) {
+                    return true;
+                }
+                else {
+                    return false;
+                }
+            }
+        }
+        if (input[i] == '<>') {
+            std::string left, right;
+            for (size_t j = 0; j < i; j++) {
+                left += input[j];
+            }
+            for (size_t j = i + 1; j < input.size(); j++) {
+                right += input[j];
+            }
+            left = trim(left);
+            right = trim(right);
+
+            int leftValue = 0;
+            int rightValue = 0;
+
+
+            try {
+                int leftValue = std::stoi(left);
+                int rightValue = std::stoi(right);
+                if (leftValue != rightValue) {
+                    return true;
+                }
+                else {
+                    return false;
+                }
+            }
+            catch (const std::exception&) {
+                auto it = variables.find(left);
+                if (it != variables.end()) {
+                    leftValue = it->second;
+                }
+                else {
+                    return false;
+                }
+
+                try {
+                    rightValue = std::stoi(right);
+                }
+                catch (const std::exception&) {
+                    auto it = variables.find(right);
+                    if (it != variables.end()) {
+                        rightValue = it->second;
+                    }
+                    else {
+                        return false;
+                    }
+                }
+                if (leftValue > rightValue) {
+                    return true;
+                }
+                else {
+                    return false;
+                }
+            }
+        }
+    }
 }
