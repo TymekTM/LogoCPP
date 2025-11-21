@@ -13,6 +13,8 @@ public:
 	bool IsArithmetic(const std::string& input);
 	bool LogicHandler(const std::string& input, std::map<std::string, int> variables);
 	std::string ExtractBracketsContent(const std::string& input, size_t startPos);
+	std::vector<std::string> ExtractArguments(const std::string& instruction);
+	std::string ExtractFunctionName(const std::string& instruction);
 private:
 	std::map<std::string, int> variables;
 };

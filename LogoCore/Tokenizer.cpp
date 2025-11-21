@@ -3,6 +3,7 @@
 #include <string>
 #include <cctype>
 #include <map>
+#include <sstream>
 #include "InstructionHandler.h"
 
 static std::string trim(const std::string& s) {
@@ -104,7 +105,7 @@ std::string Tokenizer::ExtractCommand(const std::string& input) {
     }
     else {
         for (size_t i = 0; i < t.size(); i++) {
-            if (t[i] == '(') {
+            if (t[i] == '(' || t[i] == ' ') {
                 return trim(command);
             }
             command += t[i];
@@ -159,9 +160,7 @@ int Tokenizer::ArithmericHandler(const std::string& input, std::map<std::string,
 
 
             try {
-                int leftValue = std::stoi(left);
-                int rightValue = std::stoi(right);
-                return leftValue + rightValue;
+                leftValue = std::stoi(left);
             }
             catch (const std::exception&) {
                 auto it = variables.find(left);
@@ -169,7 +168,6 @@ int Tokenizer::ArithmericHandler(const std::string& input, std::map<std::string,
                     leftValue = it->second;
                 }
                 else {
-
                     return 0; 
                 }
             }
@@ -188,7 +186,8 @@ int Tokenizer::ArithmericHandler(const std::string& input, std::map<std::string,
                     return 0; 
                 }
             }
-
+            
+            return leftValue + rightValue;
         }
         else if(input[i] == '-') {
             std::string left, right;
@@ -231,6 +230,7 @@ int Tokenizer::ArithmericHandler(const std::string& input, std::map<std::string,
                     return 0; 
                 }
             }
+            
             return leftValue - rightValue;
 		}
         else if (input[i] == '*') {
@@ -274,6 +274,7 @@ int Tokenizer::ArithmericHandler(const std::string& input, std::map<std::string,
                     return 0; 
                 }
             }
+            
             return leftValue * rightValue;
         }
     }
@@ -532,4 +533,50 @@ std::string Tokenizer::ExtractBracketsContent(const std::string& input, size_t s
     }
     
     return content;
+}
+
+std::vector<std::string> Tokenizer::ExtractArguments(const std::string& instruction) {
+    std::vector<std::string> args;
+    
+    size_t startParen = instruction.find('(');
+    size_t endParen = instruction.find(')');
+    
+    if (startParen == std::string::npos || endParen == std::string::npos) {
+        return args;
+    }
+    
+    std::string argsStr = instruction.substr(startParen + 1, endParen - startParen - 1);
+    
+    if (argsStr.empty()) {
+        return args;
+    }
+    
+    std::stringstream ss(argsStr);
+    std::string arg;
+    
+    while (std::getline(ss, arg, ',')) {
+        arg = trim(arg);
+        if (!arg.empty()) {
+            args.push_back(arg);
+        }
+    }
+    
+    return args;
+}
+
+std::string Tokenizer::ExtractFunctionName(const std::string& instruction) {
+    size_t defPos = instruction.find("def");
+    if (defPos == std::string::npos) return "";
+    
+    size_t nameStart = defPos + 3;
+    
+    while (nameStart < instruction.size() && std::isspace(instruction[nameStart])) {
+        nameStart++;
+    }
+    
+    size_t parenPos = instruction.find('(', nameStart);
+    if (parenPos == std::string::npos) return "";
+    
+    std::string functionName = instruction.substr(nameStart, parenPos - nameStart);
+    return trim(functionName);
 }

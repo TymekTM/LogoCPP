@@ -18,16 +18,89 @@ void Instruction::Instrucions(string* instructionSet)
 
 void Instruction::HandleInstruction(string instruction)
 {
-	std::string command = Tokenizer().ExtractCommand(instruction);
+	Tokenizer tokenizer;
+	std::string command = tokenizer.ExtractCommand(instruction);
 
+    // Obs³uga definiowania funkcji
+    if (command == "def") {
+        std::string functionName = tokenizer.ExtractFunctionName(instruction);
+        if (functionName.empty()) return;
+        
+        std::vector<std::string> params = tokenizer.ExtractArguments(instruction);
+        
+        size_t closeParenPos = instruction.find(')', instruction.find('('));
+        size_t bracketPos = instruction.find('{', closeParenPos);
+        
+        if (bracketPos != std::string::npos) {
+            std::string functionBody = tokenizer.ExtractBracketsContent(instruction, bracketPos);
+            
+            FunctionDefinition funcDef;
+            funcDef.parameters = params;
+            funcDef.body = functionBody;
+            
+            functions[functionName] = funcDef;
+        }
+        
+        return;
+    }
+
+    // SprawdŸ czy to wywo³anie funkcji
+    auto funcIt = functions.find(command);
+    if (funcIt != functions.end()) {
+        std::vector<std::string> args = tokenizer.ExtractArguments(instruction);
+        
+        // Utwórz lokaln¹ kopiê zmiennych
+        std::map<std::string, int> localVariables = variables;
+        
+        // Przypisz argumenty do parametrów
+        const FunctionDefinition& funcDef = funcIt->second;
+        for (size_t i = 0; i < funcDef.parameters.size() && i < args.size(); i++) {
+            try {
+                if (tokenizer.IsArithmetic(args[i])) {
+                    localVariables[funcDef.parameters[i]] = tokenizer.ArithmericHandler(args[i], variables);
+                } else {
+                    localVariables[funcDef.parameters[i]] = std::stoi(args[i]);
+                }
+            } catch (const std::exception&) {
+                auto varIt = variables.find(args[i]);
+                if (varIt != variables.end()) {
+                    localVariables[funcDef.parameters[i]] = varIt->second;
+                }
+            }
+        }
+        
+        // Tymczasowo podmieñ zmienne na lokalne
+        std::map<std::string, int> savedVariables = variables;
+        variables = localVariables;
+        
+        // Wykonaj cia³o funkcji
+        std::string body = funcDef.body;
+        Instrucions(&body);
+        
+        // Przywróæ zmienne globalne
+        for (const auto& var : variables) {
+            bool isParam = false;
+            for (const auto& param : funcDef.parameters) {
+                if (var.first == param) {
+                    isParam = true;
+                    break;
+                }
+            }
+            if (!isParam) {
+                savedVariables[var.first] = var.second;
+            }
+        }
+        variables = savedVariables;
+        
+        return;
+    }
 
     if (command == "var") {
-		variables.merge(Tokenizer().VariableHandler(instruction));
+		variables.merge(tokenizer.VariableHandler(instruction));
         return;
     }
 
     if (command == "if") {
-        Tokenizer tokenizer;
         std::string condition = tokenizer.ExtractData(instruction, variables);
         
         if (condition.empty()) {
@@ -49,13 +122,18 @@ void Instruction::HandleInstruction(string instruction)
         return;
     }
 
-    std::string dataStr = Tokenizer().ExtractData(instruction, variables);
+    std::string dataStr = tokenizer.ExtractData(instruction, variables);
 
     if (dataStr.empty()) {
         return;
     }
     
-    int data = std::stoi(dataStr);
+    int data = 0;
+    try {
+        data = std::stoi(dataStr);
+    } catch (const std::exception&) {
+        return;
+    }
 
     if (command == "Forward" || command == "forward") {
         turtle.Forward(data);
