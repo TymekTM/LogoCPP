@@ -23,12 +23,20 @@ static std::string trim(const std::string& s) {
 std::vector<std::string> Tokenizer::Tokenize(const std::string& input) {
     std::vector<std::string> commands;
     size_t begin = 0;
-    
-    for (size_t i = 0; i < input.size(); i++) {
-        if (input[i] == ';') {
+    int braceDepth = 0;
+
+    for (size_t i = 0; i < input.size(); ++i) {
+        char c = input[i];
+        if (c == '{') {
+            braceDepth++;
+        } else if (c == '}') {
+            if (braceDepth > 0) braceDepth--;
+        }
+
+        if (c == ';' && braceDepth == 0) {
             if (i > begin) {
                 std::string command;
-                for (size_t j = begin; j < i; j++) {
+                for (size_t j = begin; j < i; ++j) {
                     command += input[j];
                 }
                 command = trim(command);
@@ -42,7 +50,7 @@ std::vector<std::string> Tokenizer::Tokenize(const std::string& input) {
 
     if (begin < input.size()) {
         std::string command;
-        for (size_t j = begin; j < input.size(); j++) {
+        for (size_t j = begin; j < input.size(); ++j) {
             command += input[j];
         }
         command = trim(command);
@@ -50,7 +58,7 @@ std::vector<std::string> Tokenizer::Tokenize(const std::string& input) {
             commands.push_back(command);
         }
     }
-    
+
     return commands;
 }
 
@@ -276,7 +284,7 @@ bool isLogicalOperator(char c) {
     return c == '>' || c == '<' || c == '==' || c == '<>';
 }
 
-bool LogicHandler(const std::string& input, std::map<std::string, int> variables) {
+bool Tokenizer::LogicHandler(const std::string& input, std::map<std::string, int> variables) {
     for (size_t i = 0; i < input.size(); i++) {
         if (input[i] == '>') {
             std::string left, right;
@@ -378,7 +386,7 @@ bool LogicHandler(const std::string& input, std::map<std::string, int> variables
                         return false;
                     }
                 }
-                if (leftValue > rightValue) {
+                if (leftValue < rightValue) {
                     return true;
                 }
                 else {
@@ -386,12 +394,12 @@ bool LogicHandler(const std::string& input, std::map<std::string, int> variables
                 }
             }
         }
-        if (input[i] == '==') {
+        if (i + 1 < input.size() && input[i] == '=' && input[i + 1] == '=') {
             std::string left, right;
             for (size_t j = 0; j < i; j++) {
                 left += input[j];
             }
-            for (size_t j = i + 1; j < input.size(); j++) {
+            for (size_t j = i + 2; j < input.size(); j++) {
                 right += input[j];
             }
             left = trim(left);
@@ -432,7 +440,7 @@ bool LogicHandler(const std::string& input, std::map<std::string, int> variables
                         return false;
                     }
                 }
-                if (leftValue > rightValue) {
+                if (leftValue == rightValue) {
                     return true;
                 }
                 else {
@@ -440,12 +448,12 @@ bool LogicHandler(const std::string& input, std::map<std::string, int> variables
                 }
             }
         }
-        if (input[i] == '<>') {
+        if (i + 1 < input.size() && input[i] == '!' && input[i + 1] == '=') {
             std::string left, right;
             for (size_t j = 0; j < i; j++) {
                 left += input[j];
             }
-            for (size_t j = i + 1; j < input.size(); j++) {
+            for (size_t j = i + 2; j < input.size(); j++) {
                 right += input[j];
             }
             left = trim(left);
@@ -486,7 +494,7 @@ bool LogicHandler(const std::string& input, std::map<std::string, int> variables
                         return false;
                     }
                 }
-                if (leftValue > rightValue) {
+                if (leftValue != rightValue) {
                     return true;
                 }
                 else {
@@ -495,4 +503,33 @@ bool LogicHandler(const std::string& input, std::map<std::string, int> variables
             }
         }
     }
+    return false;
+}
+
+std::string Tokenizer::ExtractBracketsContent(const std::string& input, size_t startPos) {
+    std::string content;
+    int bracketCount = 0;
+    bool foundStart = false;
+    
+    for (size_t i = startPos; i < input.size(); i++) {
+        if (input[i] == '{') {
+            if (foundStart) {
+                content += input[i];
+            }
+            bracketCount++;
+            foundStart = true;
+        }
+        else if (input[i] == '}') {
+            bracketCount--;
+            if (bracketCount == 0) {
+                return content;
+            }
+            content += input[i];
+        }
+        else if (foundStart) {
+            content += input[i];
+        }
+    }
+    
+    return content;
 }

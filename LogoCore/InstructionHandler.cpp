@@ -26,6 +26,28 @@ void Instruction::HandleInstruction(string instruction)
         return;
     }
 
+    if (command == "if") {
+        Tokenizer tokenizer;
+        std::string condition = tokenizer.ExtractData(instruction, variables);
+        
+        if (condition.empty()) {
+            return;
+        }
+        
+        bool conditionResult = tokenizer.LogicHandler(condition, variables);
+        
+        if (conditionResult) {
+            size_t bracketPos = instruction.find('{');
+            if (bracketPos != std::string::npos) {
+                std::string blockContent = tokenizer.ExtractBracketsContent(instruction, bracketPos);
+                
+                if (!blockContent.empty()) {
+                    Instrucions(&blockContent);
+                }
+            }
+        }
+        return;
+    }
 
     std::string dataStr = Tokenizer().ExtractData(instruction, variables);
 
