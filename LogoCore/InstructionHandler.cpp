@@ -2,6 +2,7 @@
 #include "InstructionHandler.h"
 #include "Tokenizer.h"
 #include "Turtle.h"
+#include <cmath>
 
 Instruction::Instruction(Turtle& turtle)
     : turtle(turtle)
@@ -50,7 +51,7 @@ void Instruction::HandleInstruction(string instruction)
         std::vector<std::string> args = tokenizer.ExtractArguments(instruction);
         
         // Utwórz lokaln¹ kopiê zmiennych
-        std::map<std::string, int> localVariables = variables;
+        std::map<std::string, double> localVariables = variables;
         
         // Przypisz argumenty do parametrów
         const FunctionDefinition& funcDef = funcIt->second;
@@ -59,7 +60,7 @@ void Instruction::HandleInstruction(string instruction)
                 if (tokenizer.IsArithmetic(args[i])) {
                     localVariables[funcDef.parameters[i]] = tokenizer.ArithmericHandler(args[i], variables);
                 } else {
-                    localVariables[funcDef.parameters[i]] = std::stoi(args[i]);
+                    localVariables[funcDef.parameters[i]] = std::stod(args[i]);
                 }
             } catch (const std::exception&) {
                 auto varIt = variables.find(args[i]);
@@ -70,7 +71,7 @@ void Instruction::HandleInstruction(string instruction)
         }
         
         // Tymczasowo podmieñ zmienne na lokalne
-        std::map<std::string, int> savedVariables = variables;
+        std::map<std::string, double> savedVariables = variables;
         variables = localVariables;
         
         // Wykonaj cia³o funkcji
@@ -130,7 +131,7 @@ void Instruction::HandleInstruction(string instruction)
     
     int data = 0;
     try {
-        data = std::stoi(dataStr);
+        data = static_cast<int>(std::round(std::stod(dataStr)));
     } catch (const std::exception&) {
         return;
     }

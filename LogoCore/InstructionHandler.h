@@ -18,7 +18,7 @@ class Instruction {
     void Instrucions(string* instructionSet);
 	void HandleInstruction(string instruction);
 
-    std::map<string, int> variables;
+    std::map<string, double> variables;
     std::map<string, string> procedures;
     std::map<string, FunctionDefinition> functions;
     
