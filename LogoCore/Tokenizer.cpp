@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "Tokenizer.h"
+#include "ParsingHelper.h"
 #include <string>
 #include <cctype>
 #include <map>
@@ -28,6 +29,7 @@ std::vector<std::string> Tokenizer::Tokenize(const std::string& input) {
 
     for (size_t i = 0; i < input.size(); ++i) {
         char c = input[i];
+        
         if (c == '{') {
             braceDepth++;
         } else if (c == '}') {
@@ -63,7 +65,7 @@ std::vector<std::string> Tokenizer::Tokenize(const std::string& input) {
     return commands;
 }
 
-std::string Tokenizer::ExtractData(const std::string& input, std::map<std::string,int> variables) {
+std::string Tokenizer::ExtractData(const std::string& input, std::map<std::string,double> variables) {
     std::string data;
     
     for (size_t i = 0; i < input.size(); i++) {
@@ -71,22 +73,20 @@ std::string Tokenizer::ExtractData(const std::string& input, std::map<std::strin
 
             for (size_t j = i + 1; j < input.size(); j++) {
                 if (input[j] == ')') {
-					
-					auto it = variables.find(data);
+                    // Najpierw sprawdŸ czy to wyra¿enie arytmetyczne
+                    if (IsArithmetic(data)) {
+                        double result = ArithmericHandler(data, variables);
+                        return std::to_string(result);
+                    }
+                    
+                    // Potem sprawdŸ czy to zmienna
+                    auto it = variables.find(data);
                     if (it != variables.end()) {
-                        int modified = it->second;
-						if (IsArithmetic(data)) {
-                            modified = ArithmericHandler(data, variables);
-                        }
-						return std::to_string(modified);
+                        return std::to_string(it->second);
                     }
-                    else {
-						if (IsArithmetic(data)) {
-                            int result = ArithmericHandler(data, variables);
-                            return std::to_string(result);
-                        }
-						return trim(data);
-                    }
+                    
+                    // W przeciwnym razie zwróæ surow¹ wartoœæ
+                    return trim(data);
                 }
                 data += input[j];
             }
@@ -114,7 +114,7 @@ std::string Tokenizer::ExtractCommand(const std::string& input) {
     }
 }
 
-std::map<std::string,int> Tokenizer::VariableHandler(const std::string& input) {
+std::map<std::string,double> Tokenizer::VariableHandler(const std::string& input) {
 	std::string trimmedInput = trim(input);
 
 	size_t equalPos = trimmedInput.find('=');
@@ -128,7 +128,7 @@ std::map<std::string,int> Tokenizer::VariableHandler(const std::string& input) {
 	std::string varValueStr = trim(trimmedInput.substr(equalPos + 1));
 	
 	
-	int varValue = std::stoi(varValueStr);
+	double varValue = std::stod(varValueStr);
 	return { {varName, varValue} };
 }
 
@@ -141,10 +141,10 @@ bool Tokenizer::IsArithmetic(const std::string& input) {
     else return false;
 }
 
-//TO DO: BOTH, VERY REPETETIVE CODE, OPTIMIZE, SAME HELPER FUNCTION FOR BOTH
-int Tokenizer::ArithmericHandler(const std::string& input, std::map<std::string, int> variables) {
+double Tokenizer::ArithmericHandler(const std::string& input, std::map<std::string, double> variables) {
     for (size_t i = 0; i < input.size(); i++) {
-        if (input[i] == '+') {
+        char op = input[i];
+        if (op == '+' || op == '-' || op == '*') {
             std::string left, right;
             for (size_t j = 0; j < i; j++) {
                 left += input[j];
@@ -155,139 +155,23 @@ int Tokenizer::ArithmericHandler(const std::string& input, std::map<std::string,
             left = trim(left);
             right = trim(right);
 
-            int leftValue = 0;
-            int rightValue = 0;
+            double leftValue = ParsingHelper::ParseValue(left, variables);
+            double rightValue = ParsingHelper::ParseValue(right, variables);
 
-
-            try {
-                leftValue = std::stoi(left);
-            }
-            catch (const std::exception&) {
-                auto it = variables.find(left);
-                if (it != variables.end()) {
-                    leftValue = it->second;
-                }
-                else {
-                    return 0; 
-                }
-            }
-
-
-            try {
-                rightValue = std::stoi(right);
-            }
-            catch (const std::exception&) {
-                auto it = variables.find(right);
-                if (it != variables.end()) {
-                    rightValue = it->second;
-                }
-                else {
-
-                    return 0; 
-                }
-            }
-            
-            return leftValue + rightValue;
-        }
-        else if(input[i] == '-') {
-            std::string left, right;
-            for (size_t j = 0; j < i; j++) {
-                left += input[j];
-            }
-            for (size_t j = i + 1; j < input.size(); j++) {
-                right += input[j];
-            }
-            left = trim(left);
-            right = trim(right);
-
-            int leftValue = 0;
-            int rightValue = 0;
-
-
-            try {
-                leftValue = std::stoi(left);
-            }
-            catch (const std::exception&) {
-                auto it = variables.find(left);
-                if (it != variables.end()) {
-                    leftValue = it->second;
-                }
-                else {
-                    return 0;
-                }
-            }
-
-
-            try {
-                rightValue = std::stoi(right);
-            }
-            catch (const std::exception&) {
-                auto it = variables.find(right);
-                if (it != variables.end()) {
-                    rightValue = it->second;
-                }
-                else {
-                    return 0; 
-                }
-            }
-            
-            return leftValue - rightValue;
-		}
-        else if (input[i] == '*') {
-            std::string left, right;
-            for (size_t j = 0; j < i; j++) {
-                left += input[j];
-            }
-            for (size_t j = i + 1; j < input.size(); j++) {
-                right += input[j];
-            }
-            left = trim(left);
-            right = trim(right);
-
-            int leftValue = 0;
-            int rightValue = 0;
-
-
-            try {
-                leftValue = std::stoi(left);
-            }
-            catch (const std::exception&) {
-                auto it = variables.find(left);
-                if (it != variables.end()) {
-                    leftValue = it->second;
-                }
-                else {
-                    return 0; 
-                }
-            }
-
-
-            try {
-                rightValue = std::stoi(right);
-            }
-            catch (const std::exception&) {
-                auto it = variables.find(right);
-                if (it != variables.end()) {
-                    rightValue = it->second;
-                }
-                else {
-                    return 0; 
-                }
-            }
-            
-            return leftValue * rightValue;
+            if (op == '+') return leftValue + rightValue;
+            else if (op == '-') return leftValue - rightValue;
+            else if (op == '*') return leftValue * rightValue;
         }
     }
-    return 0;
+    return 0.0;
 }
 
-bool isLogicalOperator(char c) {
-    return c == '>' || c == '<' || c == '==' || c == '<>';
-}
-
-bool Tokenizer::LogicHandler(const std::string& input, std::map<std::string, int> variables) {
+bool Tokenizer::LogicHandler(const std::string& input, std::map<std::string, double> variables) {
     for (size_t i = 0; i < input.size(); i++) {
-        if (input[i] == '>') {
+        char op = input[i];
+        
+        // Handle single-character operators
+        if (op == '>' || op == '<') {
             std::string left, right;
             for (size_t j = 0; j < i; j++) {
                 left += input[j];
@@ -298,209 +182,33 @@ bool Tokenizer::LogicHandler(const std::string& input, std::map<std::string, int
             left = trim(left);
             right = trim(right);
 
-            int leftValue = 0;
-            int rightValue = 0;
+            double leftValue = ParsingHelper::ParseValue(left, variables);
+            double rightValue = ParsingHelper::ParseValue(right, variables);
 
-
-            try {
-                int leftValue = std::stoi(left);
-                int rightValue = std::stoi(right);
-                if (leftValue > rightValue) {
-                    return true;
-                }
-                else {
-                    return false;
-                }
-            }
-            catch (const std::exception&) {
-                auto it = variables.find(left);
-                if (it != variables.end()) {
-                    leftValue = it->second;
-                }
-                else {
-                    return false;
-                }
-
-                try {
-                    rightValue = std::stoi(right);
-                }
-                catch (const std::exception&) {
-                    auto it = variables.find(right);
-                    if (it != variables.end()) {
-                        rightValue = it->second;
-                    }
-                    else {
-                        return false;
-                    }
-                }
-                if (leftValue > rightValue) {
-                    return true;
-                }
-                else {
-                    return false;
-                }
-            }
+            if (op == '>') return leftValue > rightValue;
+            else return leftValue < rightValue;
         }
-        if (input[i] == '<') {
-            std::string left, right;
-            for (size_t j = 0; j < i; j++) {
-                left += input[j];
-            }
-            for (size_t j = i + 1; j < input.size(); j++) {
-                right += input[j];
-            }
-            left = trim(left);
-            right = trim(right);
+        
+        // Handle two-character operators
+        if (i + 1 < input.size()) {
+            char nextChar = input[i + 1];
+            
+            if ((op == '=' && nextChar == '=') || (op == '<' && nextChar == '>')) {
+                std::string left, right;
+                for (size_t j = 0; j < i; j++) {
+                    left += input[j];
+                }
+                for (size_t j = i + 2; j < input.size(); j++) {
+                    right += input[j];
+                }
+                left = trim(left);
+                right = trim(right);
 
-            int leftValue = 0;
-            int rightValue = 0;
+                double leftValue = ParsingHelper::ParseValue(left, variables);
+                double rightValue = ParsingHelper::ParseValue(right, variables);
 
-
-            try {
-                int leftValue = std::stoi(left);
-                int rightValue = std::stoi(right);
-                if (leftValue < rightValue) {
-                    return true;
-                }
-                else {
-                    return false;
-                }
-            }
-            catch (const std::exception&) {
-                auto it = variables.find(left);
-                if (it != variables.end()) {
-                    leftValue = it->second;
-                }
-                else {
-                    return false;
-                }
-
-                try {
-                    rightValue = std::stoi(right);
-                }
-                catch (const std::exception&) {
-                    auto it = variables.find(right);
-                    if (it != variables.end()) {
-                        rightValue = it->second;
-                    }
-                    else {
-                        return false;
-                    }
-                }
-                if (leftValue < rightValue) {
-                    return true;
-                }
-                else {
-                    return false;
-                }
-            }
-        }
-        if (i + 1 < input.size() && input[i] == '=' && input[i + 1] == '=') {
-            std::string left, right;
-            for (size_t j = 0; j < i; j++) {
-                left += input[j];
-            }
-            for (size_t j = i + 2; j < input.size(); j++) {
-                right += input[j];
-            }
-            left = trim(left);
-            right = trim(right);
-
-            int leftValue = 0;
-            int rightValue = 0;
-
-
-            try {
-                int leftValue = std::stoi(left);
-                int rightValue = std::stoi(right);
-                if (leftValue == rightValue) {
-                    return true;
-                }
-                else {
-                    return false;
-                }
-            }
-            catch (const std::exception&) {
-                auto it = variables.find(left);
-                if (it != variables.end()) {
-                    leftValue = it->second;
-                }
-                else {
-                    return false;
-                }
-
-                try {
-                    rightValue = std::stoi(right);
-                }
-                catch (const std::exception&) {
-                    auto it = variables.find(right);
-                    if (it != variables.end()) {
-                        rightValue = it->second;
-                    }
-                    else {
-                        return false;
-                    }
-                }
-                if (leftValue == rightValue) {
-                    return true;
-                }
-                else {
-                    return false;
-                }
-            }
-        }
-        if (i + 1 < input.size() && input[i] == '!' && input[i + 1] == '=') {
-            std::string left, right;
-            for (size_t j = 0; j < i; j++) {
-                left += input[j];
-            }
-            for (size_t j = i + 2; j < input.size(); j++) {
-                right += input[j];
-            }
-            left = trim(left);
-            right = trim(right);
-
-            int leftValue = 0;
-            int rightValue = 0;
-
-
-            try {
-                int leftValue = std::stoi(left);
-                int rightValue = std::stoi(right);
-                if (leftValue != rightValue) {
-                    return true;
-                }
-                else {
-                    return false;
-                }
-            }
-            catch (const std::exception&) {
-                auto it = variables.find(left);
-                if (it != variables.end()) {
-                    leftValue = it->second;
-                }
-                else {
-                    return false;
-                }
-
-                try {
-                    rightValue = std::stoi(right);
-                }
-                catch (const std::exception&) {
-                    auto it = variables.find(right);
-                    if (it != variables.end()) {
-                        rightValue = it->second;
-                    }
-                    else {
-                        return false;
-                    }
-                }
-                if (leftValue != rightValue) {
-                    return true;
-                }
-                else {
-                    return false;
-                }
+                if (op == '=') return leftValue == rightValue;
+                else return leftValue != rightValue;
             }
         }
     }
