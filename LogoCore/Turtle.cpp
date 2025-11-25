@@ -34,7 +34,6 @@ void Turtle::Forward(int distance)
 		int newY = posY + static_cast<int>(round(i * dy));
 		
 		canvas.setPixel(newX, newY, pen);
-		canvas.setPixel(newX, newY, pen);
 	}
 	
 	posX = posX + static_cast<int>(round(distance * dx));
@@ -71,6 +70,3 @@ void Turtle::Right(int angle)
 {
 	this->angle += angle;
 }
-
-
-

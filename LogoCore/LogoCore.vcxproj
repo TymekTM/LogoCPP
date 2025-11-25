@@ -143,7 +143,6 @@
     <ClInclude Include="FileHandler.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="InstructionHandler.h" />
-    <ClInclude Include="IsInbound.h" />
     <ClInclude Include="LogoCore.h" />
     <ClInclude Include="ParsingHelper.h" />
     <ClInclude Include="pch.h" />

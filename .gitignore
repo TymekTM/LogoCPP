@@ -460,3 +460,4 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+output.txt

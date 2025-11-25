@@ -73,19 +73,19 @@ std::string Tokenizer::ExtractData(const std::string& input, std::map<std::strin
 
             for (size_t j = i + 1; j < input.size(); j++) {
                 if (input[j] == ')') {
-                    // Najpierw sprawd� czy to wyra�enie arytmetyczne
+                    // Najpierw sprawdź czy to wyrażenie arytmetyczne
                     if (IsArithmetic(data)) {
                         double result = ArithmericHandler(data, variables);
                         return std::to_string(result);
                     }
                     
-                    // Potem sprawd� czy to zmienna
+                    // Sprawdź czy to zmienna
                     auto it = variables.find(data);
                     if (it != variables.end()) {
                         return std::to_string(it->second);
                     }
                     
-                    // W przeciwnym razie zwr�� surow� warto��
+                    // W przeciwnym razie zwróć surowe wartości
                     return trim(data);
                 }
                 data += input[j];
@@ -124,9 +124,7 @@ std::map<std::string,double> Tokenizer::VariableHandler(const std::string& input
 
 	std::string varName = trim(trimmedInput.substr(0, equalPos));
 	
-
 	std::string varValueStr = trim(trimmedInput.substr(equalPos + 1));
-	
 	
 	double varValue = std::stod(varValueStr);
 	return { {varName, varValue} };
@@ -144,14 +142,18 @@ bool Tokenizer::IsArithmetic(const std::string& input) {
 double Tokenizer::ArithmericHandler(const std::string& input, std::map<std::string, double> variables) {
     for (size_t i = 0; i < input.size(); i++) {
         char op = input[i];
+
         if (op == '+' || op == '-' || op == '*') {
+
             std::string left, right;
             for (size_t j = 0; j < i; j++) {
                 left += input[j];
             }
+
             for (size_t j = i + 1; j < input.size(); j++) {
                 right += input[j];
             }
+
             left = trim(left);
             right = trim(right);
 
@@ -170,18 +172,21 @@ bool Tokenizer::LogicHandler(const std::string& input, std::map<std::string, dou
     for (size_t i = 0; i < input.size(); i++) {
         char op = input[i];
         
-        // Handle two-character operators first (==, <>, >=, <=)
+        // Handle two-character operators first (==, <>)
         if (i + 1 < input.size()) {
             char nextChar = input[i + 1];
             
             if ((op == '=' && nextChar == '=') || (op == '<' && nextChar == '>')) {
+
                 std::string left, right;
                 for (size_t j = 0; j < i; j++) {
                     left += input[j];
                 }
+
                 for (size_t j = i + 2; j < input.size(); j++) {
                     right += input[j];
                 }
+
                 left = trim(left);
                 right = trim(right);
 
@@ -200,7 +205,7 @@ bool Tokenizer::LogicHandler(const std::string& input, std::map<std::string, dou
         char op = input[i];
         
         // Handle single-character operators (>, <, =)
-        if (op == '>' || op == '<' || op == '=') {
+        if (op == '>' || op == '<') {
             // Pomiń jeśli to część dwuznakowego operatora
             if (i + 1 < input.size()) {
                 char nextChar = input[i + 1];
@@ -228,7 +233,6 @@ bool Tokenizer::LogicHandler(const std::string& input, std::map<std::string, dou
 
             if (op == '>') return leftValue > rightValue;
             else if (op == '<') return leftValue < rightValue;
-            else if (op == '=') return leftValue == rightValue;
         }
     }
     return false;

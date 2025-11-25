@@ -33,9 +33,6 @@
     <ClInclude Include="InstructionHandler.h">
       <Filter>Pliki nagłówkowe</Filter>
     </ClInclude>
-    <ClInclude Include="IsInbound.h">
-      <Filter>Pliki nagłówkowe</Filter>
-    </ClInclude>
     <ClInclude Include="Tokenizer.h">
       <Filter>Pliki nagłówkowe</Filter>
     </ClInclude>

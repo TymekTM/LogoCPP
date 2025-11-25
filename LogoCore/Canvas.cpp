@@ -26,7 +26,7 @@ void Canvas::expandIfNeeded(int x, int y) {
     
     // Rozszerzanie w dół (y >= height)
     if (internalY >= currentHeight) {
-        int newHeight = internalY + 1;
+        int newHeight = internalY + 1 + 50;
         grid.resize(newHeight);
         for (int i = currentHeight; i < newHeight; ++i) {
             grid[i].resize(currentWidth, ' ');
@@ -35,7 +35,7 @@ void Canvas::expandIfNeeded(int x, int y) {
     
     // Rozszerzanie w prawo (x >= width)
     if (internalX >= currentWidth) {
-        int newWidth = internalX + 1;
+        int newWidth = internalX + 1 + 50;
         for (auto& row : grid) {
             row.resize(newWidth, ' ');
         }
@@ -43,7 +43,7 @@ void Canvas::expandIfNeeded(int x, int y) {
     
     // Rozszerzanie w górę (y < 0 po przeliczeniu) - wymaga przesunięcia
     if (internalY < 0) {
-        int addRows = -internalY;
+        int addRows = -internalY + 50;
         currentHeight = static_cast<int>(grid.size());
         currentWidth = currentHeight > 0 ? static_cast<int>(grid[0].size()) : initialWidth;
         
@@ -71,7 +71,7 @@ void Canvas::expandIfNeeded(int x, int y) {
     
     // Rozszerzanie w lewo (x < 0 po przeliczeniu) - wymaga przesunięcia
     if (internalX < 0) {
-        int addCols = -internalX;
+        int addCols = -internalX + 50;
         currentWidth = static_cast<int>(grid[0].size());
         int newWidth = currentWidth + addCols;
         
