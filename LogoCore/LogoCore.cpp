@@ -9,13 +9,20 @@
 #include "Turtle.h"
 #include "Canvas.h"
 
-char** TurtleInstructions(std::string instructions, int width, int height, char pen)
+std::vector<std::vector<char>> TurtleInstructions(const std::string& instructions, int width, int height, char pen, bool trimOutput)
 {
 	Canvas canvas(width, height);
 	Turtle turtle(canvas, pen);
     Instruction instructionHandler(turtle);
     
-    instructionHandler.Instrucions(&instructions);
+    // Kopiujemy string bo Instructions wymaga non-const pointer
+    std::string InstructionsCoppy = instructions;
+    instructionHandler.Instrucions(&InstructionsCoppy);
+
+    // Opcjonalne trimowanie dla optymalizacji I/O
+    if (trimOutput) {
+        canvas.trim();
+    }
 
     return canvas.getGrid();
 }

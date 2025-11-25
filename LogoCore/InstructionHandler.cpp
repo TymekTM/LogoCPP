@@ -22,7 +22,6 @@ void Instruction::HandleInstruction(string instruction)
 	Tokenizer tokenizer;
 	std::string command = tokenizer.ExtractCommand(instruction);
 
-    // Obs³uga definiowania funkcji
     if (command == "def") {
         std::string functionName = tokenizer.ExtractFunctionName(instruction);
         if (functionName.empty()) return;
@@ -45,15 +44,14 @@ void Instruction::HandleInstruction(string instruction)
         return;
     }
 
-    // SprawdŸ czy to wywo³anie funkcji
+    // SprawdÅº czy to wywoÅ‚anie funkcji
     auto funcIt = functions.find(command);
     if (funcIt != functions.end()) {
         std::vector<std::string> args = tokenizer.ExtractArguments(instruction);
         
-        // Utwórz lokaln¹ kopiê zmiennych
+        // UtwÃ³rz lokalnÄ… kopiÄ™ zmiennych
         std::map<std::string, double> localVariables = variables;
         
-        // Przypisz argumenty do parametrów
         const FunctionDefinition& funcDef = funcIt->second;
         for (size_t i = 0; i < funcDef.parameters.size() && i < args.size(); i++) {
             try {
@@ -70,15 +68,14 @@ void Instruction::HandleInstruction(string instruction)
             }
         }
         
-        // Tymczasowo podmieñ zmienne na lokalne
+        // Tymczasowo podmieÅ„ zmienne na lokalne
         std::map<std::string, double> savedVariables = variables;
         variables = localVariables;
         
-        // Wykonaj cia³o funkcji
         std::string body = funcDef.body;
         Instrucions(&body);
         
-        // Przywróæ zmienne globalne
+        // PrzywrÃ³Ä‡ zmienne globalne
         for (const auto& var : variables) {
             bool isParam = false;
             for (const auto& param : funcDef.parameters) {
@@ -136,19 +133,20 @@ void Instruction::HandleInstruction(string instruction)
         return;
     }
 
-    if (command == "Forward" || command == "forward") {
+    // ObsÅ‚uga poleceÅ„ ruchu - angielskie i polskie nazwy
+    if (command == "Forward" || command == "forward" || command == "przod" || command == "Przod") {
         turtle.Forward(data);
 		return;
     }
-    else if (command == "Backward" || command == "backward") {
+    else if (command == "Backward" || command == "backward" || command == "tyl" || command == "Tyl") {
         turtle.Backward(data);
 		return;
     }
-    else if (command == "Left" || command == "left") {
+    else if (command == "Left" || command == "left" || command == "lewo" || command == "Lewo") {
         turtle.Left(data);
         return;
     }
-    else if (command == "Right" || command == "right") {
+    else if (command == "Right" || command == "right" || command == "prawo" || command == "Prawo") {
         turtle.Right(data);
         return;
     }

@@ -19,7 +19,7 @@ std::string FileHandler::ReadInputFile(const std::string& filename) {
     return buffer.str();
 }
 
-bool FileHandler::WriteOutputFile(const std::string& filename, char** grid, int size) {
+bool FileHandler::WriteOutputFile(const std::string& filename, const std::vector<std::vector<char>>& grid) {
     std::ofstream file(filename);
     
     if (!file.is_open()) {
@@ -27,13 +27,24 @@ bool FileHandler::WriteOutputFile(const std::string& filename, char** grid, int 
         return false;
     }
     
-    for (int i = 0; i < size; ++i) {
-        for (int j = 0; j < size; ++j) {
-            file << grid[i][j];
-        }
-        file << '\n';
+    const size_t height = grid.size();
+    if (height == 0) {
+        file.close();
+        return true;
     }
     
+    const size_t width = grid[0].size();
+    
+    // Buforowanie całego outputu dla szybszego zapisu
+    std::string buffer;
+    buffer.reserve(height * (width + 1)); // +1 na newline
+    
+    for (size_t i = 0; i < height; ++i) {
+        buffer.append(grid[i].begin(), grid[i].end());
+        buffer += '\n';
+    }
+    
+    file << buffer;
     file.close();
     return true;
 }

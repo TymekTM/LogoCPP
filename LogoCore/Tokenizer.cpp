@@ -73,19 +73,19 @@ std::string Tokenizer::ExtractData(const std::string& input, std::map<std::strin
 
             for (size_t j = i + 1; j < input.size(); j++) {
                 if (input[j] == ')') {
-                    // Najpierw sprawdŸ czy to wyra¿enie arytmetyczne
+                    // Najpierw sprawdï¿½ czy to wyraï¿½enie arytmetyczne
                     if (IsArithmetic(data)) {
                         double result = ArithmericHandler(data, variables);
                         return std::to_string(result);
                     }
                     
-                    // Potem sprawdŸ czy to zmienna
+                    // Potem sprawdï¿½ czy to zmienna
                     auto it = variables.find(data);
                     if (it != variables.end()) {
                         return std::to_string(it->second);
                     }
                     
-                    // W przeciwnym razie zwróæ surow¹ wartoœæ
+                    // W przeciwnym razie zwrï¿½ï¿½ surowï¿½ wartoï¿½ï¿½
                     return trim(data);
                 }
                 data += input[j];
@@ -170,26 +170,7 @@ bool Tokenizer::LogicHandler(const std::string& input, std::map<std::string, dou
     for (size_t i = 0; i < input.size(); i++) {
         char op = input[i];
         
-        // Handle single-character operators
-        if (op == '>' || op == '<') {
-            std::string left, right;
-            for (size_t j = 0; j < i; j++) {
-                left += input[j];
-            }
-            for (size_t j = i + 1; j < input.size(); j++) {
-                right += input[j];
-            }
-            left = trim(left);
-            right = trim(right);
-
-            double leftValue = ParsingHelper::ParseValue(left, variables);
-            double rightValue = ParsingHelper::ParseValue(right, variables);
-
-            if (op == '>') return leftValue > rightValue;
-            else return leftValue < rightValue;
-        }
-        
-        // Handle two-character operators
+        // Handle two-character operators first (==, <>, >=, <=)
         if (i + 1 < input.size()) {
             char nextChar = input[i + 1];
             
@@ -207,9 +188,47 @@ bool Tokenizer::LogicHandler(const std::string& input, std::map<std::string, dou
                 double leftValue = ParsingHelper::ParseValue(left, variables);
                 double rightValue = ParsingHelper::ParseValue(right, variables);
 
-                if (op == '=') return leftValue == rightValue;
-                else return leftValue != rightValue;
+                if (op == '=' && nextChar == '=') return leftValue == rightValue;
+                else if (op == '<' && nextChar == '>') return leftValue != rightValue;
+                else if (op == '>' && nextChar == '=') return leftValue >= rightValue;
+                else if (op == '<' && nextChar == '=') return leftValue <= rightValue;
             }
+        }
+    }
+    
+    for (size_t i = 0; i < input.size(); i++) {
+        char op = input[i];
+        
+        // Handle single-character operators (>, <, =)
+        if (op == '>' || op == '<' || op == '=') {
+            // PomiÅ„ jeÅ›li to czÄ™Å›Ä‡ dwuznakowego operatora
+            if (i + 1 < input.size()) {
+                char nextChar = input[i + 1];
+                if ((op == '=' && nextChar == '=') || (op == '<' && nextChar == '>') ||
+                    (op == '>' && nextChar == '=') || (op == '<' && nextChar == '=')) {
+                    continue;
+                }
+            }
+            if (i > 0 && (input[i-1] == '<' || input[i-1] == '>')) {
+                continue;
+            }
+            
+            std::string left, right;
+            for (size_t j = 0; j < i; j++) {
+                left += input[j];
+            }
+            for (size_t j = i + 1; j < input.size(); j++) {
+                right += input[j];
+            }
+            left = trim(left);
+            right = trim(right);
+
+            double leftValue = ParsingHelper::ParseValue(left, variables);
+            double rightValue = ParsingHelper::ParseValue(right, variables);
+
+            if (op == '>') return leftValue > rightValue;
+            else if (op == '<') return leftValue < rightValue;
+            else if (op == '=') return leftValue == rightValue;
         }
     }
     return false;
