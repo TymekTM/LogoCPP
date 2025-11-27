@@ -1,0 +1,14 @@
+def krzaczek(x, n){
+    if (n > 0){
+        forward(x);
+        left(45);
+        krzaczek(x * 0.75, n - 1);
+
+        right(90);
+        krzaczek(x * 0.75, n - 1);
+
+        left(45);
+        backward(x);
+    };
+};
+krzaczek(50, 15);

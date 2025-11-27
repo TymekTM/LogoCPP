@@ -461,3 +461,4 @@ FodyWeavers.xsd
 *.msm
 *.msp
 output.txt
+tests/benchmark_output.txt
