@@ -11,4 +11,4 @@ def krzaczek(x, n){
         backward(x);
     };
 };
-krzaczek(20, 3);
+krzaczek(20, 8);

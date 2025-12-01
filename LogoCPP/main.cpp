@@ -1,7 +1,7 @@
 ﻿#include <iostream>
 #include <string>
 #include "../LogoCore/LogoCore.h"
-#include "../LogoCore/FileHandler.h"
+#include "FileHandler.h"
 
 void printUsage() {
     std::cout << "Usage: LogoCPP -i <input_file> -o <output_path> -s <canvas_size>" << std::endl;
@@ -54,7 +54,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    std::cout << "Sucess! Output saved to: " << outputFile << std::endl;
+    std::cout << "Success! Output saved to: " << outputFile << std::endl;
 
     return 0;
 }

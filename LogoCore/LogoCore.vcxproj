@@ -140,7 +140,6 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="Canvas.h" />
-    <ClInclude Include="FileHandler.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="InstructionHandler.h" />
     <ClInclude Include="IsInbound.h" />
@@ -152,7 +151,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Canvas.cpp" />
-    <ClCompile Include="FileHandler.cpp" />
     <ClCompile Include="InstructionHandler.cpp" />
     <ClCompile Include="LogoCore.cpp" />
     <ClCompile Include="ParsingHelper.cpp" />
