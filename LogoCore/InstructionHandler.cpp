@@ -116,7 +116,10 @@ void Instruction::HandleInstruction(const std::string& instruction, Tokenizer& t
 
     // Obsługa zmiennych
     if (cmdType == CommandType::Var) {
-        variables.merge(tokenizer.VariableHandler(instruction));
+        auto newVars = tokenizer.VariableHandler(instruction);
+        for (auto& [key, value] : newVars) {
+            variables.insert_or_assign(key, value);
+        }
         return;
     }
 
