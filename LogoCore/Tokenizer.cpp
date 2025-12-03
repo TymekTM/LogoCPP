@@ -282,11 +282,26 @@ std::vector<std::string> Tokenizer::ExtractArguments(const std::string& instruct
 }
 
 std::string Tokenizer::ExtractFunctionName(const std::string& instruction) {
-    size_t defPos = instruction.find("def");
-    if (defPos == std::string::npos) return "";
+    size_t defPos = 0;
+    const size_t instrSize = instruction.size();
+    
+    while (defPos < instrSize) {
+        size_t pos = instruction.find("def", defPos);
+        if (pos == std::string::npos) return "";
+        
+        bool validStart = (pos == 0) || std::isspace(static_cast<unsigned char>(instruction[pos - 1]));
+        bool validEnd = (pos + 3 < instrSize) && std::isspace(static_cast<unsigned char>(instruction[pos + 3]));
+        
+        if (validStart && validEnd) {
+            defPos = pos;
+            break;
+        }
+        defPos = pos + 1;
+    }
+    
+    if (defPos >= instrSize) return "";
     
     size_t nameStart = defPos + 3;
-    const size_t instrSize = instruction.size();
     
     while (nameStart < instrSize && std::isspace(static_cast<unsigned char>(instruction[nameStart]))) {
         nameStart++;
