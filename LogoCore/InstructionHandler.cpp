@@ -4,25 +4,54 @@
 #include "Turtle.h"
 #include <cmath>
 
+// Inicjalizacja statycznej tablicy lookup dla komend
+std::unordered_map<std::string, CommandType> Instruction::InitCommandLookup() {
+    return {
+        {"Forward", CommandType::Forward}, {"forward", CommandType::Forward},
+        {"przod", CommandType::Forward}, {"Przod", CommandType::Forward},
+        {"Backward", CommandType::Backward}, {"backward", CommandType::Backward},
+        {"tyl", CommandType::Backward}, {"Tyl", CommandType::Backward},
+        {"Left", CommandType::Left}, {"left", CommandType::Left},
+        {"lewo", CommandType::Left}, {"Lewo", CommandType::Left},
+        {"Right", CommandType::Right}, {"right", CommandType::Right},
+        {"prawo", CommandType::Right}, {"Prawo", CommandType::Right},
+        {"var", CommandType::Var},
+        {"if", CommandType::If},
+        {"def", CommandType::Def}
+    };
+}
+
+const std::unordered_map<std::string, CommandType> Instruction::commandLookup = Instruction::InitCommandLookup();
+
 Instruction::Instruction(Turtle& turtle)
     : turtle(turtle)
 {
 }
 
-void Instruction::Instrucions(string* instructionSet)
-{
-	Tokenizer tokenizer;
-	for (const auto& instruction : tokenizer.Tokenize(*instructionSet)) {
-		HandleInstruction(instruction);
-	}
+CommandType Instruction::GetCommandType(const std::string& command) const {
+    auto it = commandLookup.find(command);
+    if (it != commandLookup.end()) {
+        return it->second;
+    }
+    // Sprawdź czy to zdefiniowana funkcja
+    if (functions.find(command) != functions.end()) {
+        return CommandType::Function;
+    }
+    return CommandType::Unknown;
 }
 
-void Instruction::HandleInstruction(string instruction)
-{
-	Tokenizer tokenizer;
-	std::string command = tokenizer.ExtractCommand(instruction);
+void Instruction::Execute(const std::string& instructionSet) {
+    Tokenizer tokenizer;
+    tokenizer.TokenizeAndExecute(instructionSet, *this);
+}
 
-    if (command == "def") {
+void Instruction::HandleInstruction(const std::string& instruction, Tokenizer& tokenizer)
+{
+    std::string command = tokenizer.ExtractCommand(instruction);
+    CommandType cmdType = GetCommandType(command);
+
+    // Obsługa definicji funkcji
+    if (cmdType == CommandType::Def) {
         std::string functionName = tokenizer.ExtractFunctionName(instruction);
         if (functionName.empty()) return;
         
@@ -32,27 +61,22 @@ void Instruction::HandleInstruction(string instruction)
         size_t bracketPos = instruction.find('{', closeParenPos);
         
         if (bracketPos != std::string::npos) {
-            std::string functionBody = tokenizer.ExtractBracketsContent(instruction, bracketPos);
-            
             FunctionDefinition funcDef;
-            funcDef.parameters = params;
-            funcDef.body = functionBody;
-            
-            functions[functionName] = funcDef;
+            funcDef.parameters = std::move(params);
+            funcDef.body = tokenizer.ExtractBracketsContent(instruction, bracketPos);
+            functions[functionName] = std::move(funcDef);
         }
-        
         return;
     }
 
-    // Sprawdź czy to wywołanie funkcji
-    auto funcIt = functions.find(command);
-    if (funcIt != functions.end()) {
+    // Wywołanie funkcji użytkownika
+    if (cmdType == CommandType::Function) {
+        const FunctionDefinition& funcDef = functions[command];
         std::vector<std::string> args = tokenizer.ExtractArguments(instruction);
         
         // Utwórz lokalną kopię zmiennych
         std::map<std::string, double> localVariables = variables;
         
-        const FunctionDefinition& funcDef = funcIt->second;
         for (size_t i = 0; i < funcDef.parameters.size() && i < args.size(); i++) {
             try {
                 if (tokenizer.IsArithmetic(args[i])) {
@@ -68,14 +92,12 @@ void Instruction::HandleInstruction(string instruction)
             }
         }
         
-        // Tymczasowo podmień zmienne na lokalne
-        std::map<std::string, double> savedVariables = variables;
-        variables = localVariables;
+        std::map<std::string, double> savedVariables = std::move(variables);
+        variables = std::move(localVariables);
         
-        std::string body = funcDef.body;
-        Instrucions(&body);
+        tokenizer.TokenizeAndExecute(funcDef.body, *this);
         
-        // Przywróć zmienne globalne
+        // Przywróć zmienne globalne (zachowaj nowe zmienne nie będące parametrami)
         for (const auto& var : variables) {
             bool isParam = false;
             for (const auto& param : funcDef.parameters) {
@@ -88,43 +110,36 @@ void Instruction::HandleInstruction(string instruction)
                 savedVariables[var.first] = var.second;
             }
         }
-        variables = savedVariables;
-        
+        variables = std::move(savedVariables);
         return;
     }
 
-    if (command == "var") {
-		variables.merge(tokenizer.VariableHandler(instruction));
+    // Obsługa zmiennych
+    if (cmdType == CommandType::Var) {
+        variables.merge(tokenizer.VariableHandler(instruction));
         return;
     }
 
-    if (command == "if") {
+    // Obsługa warunku if
+    if (cmdType == CommandType::If) {
         std::string condition = tokenizer.ExtractData(instruction, variables);
+        if (condition.empty()) return;
         
-        if (condition.empty()) {
-            return;
-        }
-        
-        bool conditionResult = tokenizer.LogicHandler(condition, variables);
-        
-        if (conditionResult) {
+        if (tokenizer.LogicHandler(condition, variables)) {
             size_t bracketPos = instruction.find('{');
             if (bracketPos != std::string::npos) {
                 std::string blockContent = tokenizer.ExtractBracketsContent(instruction, bracketPos);
-                
                 if (!blockContent.empty()) {
-                    Instrucions(&blockContent);
+                    tokenizer.TokenizeAndExecute(blockContent, *this);
                 }
             }
         }
         return;
     }
 
+    // Komendy ruchu
     std::string dataStr = tokenizer.ExtractData(instruction, variables);
-
-    if (dataStr.empty()) {
-        return;
-    }
+    if (dataStr.empty()) return;
     
     int data = 0;
     try {
@@ -133,23 +148,20 @@ void Instruction::HandleInstruction(string instruction)
         return;
     }
 
-    // Obsługa poleceń ruchu - angielskie i polskie nazwy
-    if (command == "Forward" || command == "forward" || command == "przod" || command == "Przod") {
-        turtle.Forward(data);
-		return;
-    }
-    else if (command == "Backward" || command == "backward" || command == "tyl" || command == "Tyl") {
-        turtle.Backward(data);
-		return;
-    }
-    else if (command == "Left" || command == "left" || command == "lewo" || command == "Lewo") {
-        turtle.Left(data);
-        return;
-    }
-    else if (command == "Right" || command == "right" || command == "prawo" || command == "Prawo") {
-        turtle.Right(data);
-        return;
+    switch (cmdType) {
+        case CommandType::Forward:
+            turtle.Forward(data);
+            break;
+        case CommandType::Backward:
+            turtle.Backward(data);
+            break;
+        case CommandType::Left:
+            turtle.Left(data);
+            break;
+        case CommandType::Right:
+            turtle.Right(data);
+            break;
+        default:
+            break;
     }
 }
-
-
