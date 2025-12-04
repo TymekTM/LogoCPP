@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Ustandaryzowany benchmark porownawczy LogoCPP vs Python turtle
-Testuje wydajnosc parsowania i wykonania rekurencyjnej funkcji fraktalnej
+Benchmark porownawczy LogoCPP vs Python turtle (oficjalna biblioteka)
+Testuje wydajnosc wykonania rekurencyjnej funkcji fraktalnej
 """
 
 import time
@@ -17,7 +17,6 @@ DEPTH_STANDARD = 8
 DEPTH_HEAVY = 12
 DEPTH_SUPER_HEAVY = 15
 CANVAS_SIZE = 500
-
 
 def krzaczek(t, x, n):
     """Rekurencyjna funkcja fraktalna - identyczna z wersja Logo"""
@@ -34,11 +33,11 @@ def krzaczek(t, x, n):
 
 
 def benchmark_python(iterations, depth):
-    """Benchmark biblioteki turtle w Pythonie"""
+    """Benchmark oficjalnej biblioteki turtle w Pythonie (headless)"""
     # Reset turtle dla nowego testu
     turtle.clearscreen()
     screen = turtle.Screen()
-    screen.setup(CANVAS_SIZE, CANVAS_SIZE)
+    screen.setup(width=1, height=1, startx=0, starty=0)
     screen.tracer(0, 0)  # Wylacz animacje
     t = turtle.Turtle()
     t.speed(0)
@@ -114,7 +113,8 @@ def print_separator():
 
 def main():
     print_separator()
-    print("       BENCHMARK POROWNAWCZY: LogoCPP vs Python")
+    print("       BENCHMARK POROWNAWCZY: LogoCPP vs Python turtle")
+    print("       (LogoCPP: interpreter Logo, Python: oficjalna biblioteka)")
     print_separator()
     print(f"\nKonfiguracja:")
     print(f"  - Iteracje: {ITERATIONS}")
@@ -144,7 +144,7 @@ def main():
         print(f"  Srednia/iteracje: {cpp_avg:.4f} ms")
         
         # Porownanie
-        if py_avg > 0 and cpp_avg > 0:
+        if py_avg > 0 and cpp_avg is not None and cpp_avg > 0:
             ratio = py_avg / cpp_avg
             faster = "LogoCPP" if ratio > 1 else "Python"
             ratio = ratio if ratio > 1 else 1/ratio
@@ -172,7 +172,7 @@ def main():
         print(f"  Czas calkowity: {cpp_total_h:.2f} ms ({heavy_iterations} iteracji)")
         print(f"  Srednia/iteracje: {cpp_avg_h:.4f} ms")
         
-        if py_avg_h > 0 and cpp_avg_h > 0:
+        if py_avg_h > 0 and cpp_avg_h is not None and cpp_avg_h > 0:
             ratio_h = py_avg_h / cpp_avg_h
             faster_h = "LogoCPP" if ratio_h > 1 else "Python"
             ratio_h = ratio_h if ratio_h > 1 else 1/ratio_h
@@ -200,7 +200,7 @@ def main():
         print(f"  Czas calkowity: {cpp_total_sh:.2f} ms ({super_heavy_iterations} iteracji)")
         print(f"  Srednia/iteracje: {cpp_avg_sh:.4f} ms")
         
-        if py_avg_sh > 0 and cpp_avg_sh > 0:
+        if py_avg_sh > 0 and cpp_avg_sh is not None and cpp_avg_sh > 0:
             ratio_sh = py_avg_sh / cpp_avg_sh
             faster_sh = "LogoCPP" if ratio_sh > 1 else "Python"
             ratio_sh = ratio_sh if ratio_sh > 1 else 1/ratio_sh
