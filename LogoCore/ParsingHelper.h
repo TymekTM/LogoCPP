@@ -1,7 +1,7 @@
 #pragma once
 #include <string>
-#include <map>
+#include <unordered_map>
 
 namespace ParsingHelper {
-    double ParseValue(const std::string& value, const std::map<std::string, double>& variables);
+    double ParseValue(const std::string& value, const std::unordered_map<std::string, double>& variables);
 }
