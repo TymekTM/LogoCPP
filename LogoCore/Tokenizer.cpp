@@ -3,7 +3,7 @@
 #include "ParsingHelper.h"
 #include <string>
 #include <cctype>
-#include <map>
+#include <unordered_map>
 #include "InstructionHandler.h"
 
 // Zoptymalizowana wersja trim używająca string_view (bez alokacji)
@@ -64,7 +64,7 @@ void Tokenizer::TokenizeAndExecute(const std::string& input, Instruction& handle
     }
 }
 
-std::string Tokenizer::ExtractData(const std::string& input, const std::map<std::string,double>& variables) {
+std::string Tokenizer::ExtractData(const std::string& input, const std::unordered_map<std::string,double>& variables) {
     const size_t inputSize = input.size();
     
     for (size_t i = 0; i < inputSize; i++) {
@@ -127,12 +127,12 @@ std::string Tokenizer::ExtractCommand(const std::string& input) {
     return std::string(cmdView);
 }
 
-std::map<std::string,double> Tokenizer::VariableHandler(const std::string& input) {
+std::pair<std::string, double> Tokenizer::VariableHandler(const std::string& input) {
     std::string_view trimmedInput = TrimView(input);
 
     size_t equalPos = trimmedInput.find('=');
     if (equalPos == std::string_view::npos) {
-        return {};
+        return {"", 0.0};
     }
 
     std::string_view varNameView = TrimView(trimmedInput.substr(0, equalPos));
@@ -140,7 +140,7 @@ std::map<std::string,double> Tokenizer::VariableHandler(const std::string& input
     
     std::string varName(varNameView);
     double varValue = std::stod(std::string(varValueView));
-    return { {std::move(varName), varValue} };
+    return {std::move(varName), varValue};
 }
 
 bool Tokenizer::IsArithmetic(const std::string& input) const noexcept {
@@ -152,7 +152,7 @@ bool Tokenizer::IsArithmetic(const std::string& input) const noexcept {
     return false;
 }
 
-double Tokenizer::ArithmericHandler(const std::string& input, const std::map<std::string, double>& variables) {
+double Tokenizer::ArithmericHandler(const std::string& input, const std::unordered_map<std::string, double>& variables) {
     const size_t inputSize = input.size();
     
     for (size_t i = 0; i < inputSize; i++) {
@@ -174,7 +174,7 @@ double Tokenizer::ArithmericHandler(const std::string& input, const std::map<std
     return 0.0;
 }
 
-bool Tokenizer::LogicHandler(const std::string& input, const std::map<std::string, double>& variables) {
+bool Tokenizer::LogicHandler(const std::string& input, const std::unordered_map<std::string, double>& variables) {
     const size_t inputSize = input.size();
     
     // Szybkie sprawdzenie dwuznakowych operatorów

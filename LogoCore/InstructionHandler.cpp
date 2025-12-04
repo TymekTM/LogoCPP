@@ -2,6 +2,7 @@
 #include "InstructionHandler.h"
 #include "Tokenizer.h"
 #include "Turtle.h"
+#include "ParsingHelper.h"
 #include <cmath>
 
 // Inicjalizacja statycznej tablicy lookup dla komend
@@ -75,24 +76,17 @@ void Instruction::HandleInstruction(const std::string& instruction, Tokenizer& t
         std::vector<std::string> args = tokenizer.ExtractArguments(instruction);
         
         // Utwórz lokalną kopię zmiennych
-        std::map<std::string, double> localVariables = variables;
+        std::unordered_map<std::string, double> localVariables = variables;
         
         for (size_t i = 0; i < funcDef.parameters.size() && i < args.size(); i++) {
-            try {
-                if (tokenizer.IsArithmetic(args[i])) {
-                    localVariables[funcDef.parameters[i]] = tokenizer.ArithmericHandler(args[i], variables);
-                } else {
-                    localVariables[funcDef.parameters[i]] = std::stod(args[i]);
-                }
-            } catch (const std::exception&) {
-                auto varIt = variables.find(args[i]);
-                if (varIt != variables.end()) {
-                    localVariables[funcDef.parameters[i]] = varIt->second;
-                }
+            if (tokenizer.IsArithmetic(args[i])) {
+                localVariables[funcDef.parameters[i]] = tokenizer.ArithmericHandler(args[i], variables);
+            } else {
+                localVariables[funcDef.parameters[i]] = ParsingHelper::ParseValue(args[i], variables);
             }
         }
         
-        std::map<std::string, double> savedVariables = std::move(variables);
+        std::unordered_map<std::string, double> savedVariables = std::move(variables);
         variables = std::move(localVariables);
         
         tokenizer.TokenizeAndExecute(funcDef.body, *this);
@@ -116,9 +110,9 @@ void Instruction::HandleInstruction(const std::string& instruction, Tokenizer& t
 
     // Obsługa zmiennych
     if (cmdType == CommandType::Var) {
-        auto newVars = tokenizer.VariableHandler(instruction);
-        for (auto& [key, value] : newVars) {
-            variables.insert_or_assign(key, value);
+        auto [key, value] = tokenizer.VariableHandler(instruction);
+        if (!key.empty()) {
+            variables[std::move(key)] = value;
         }
         return;
     }

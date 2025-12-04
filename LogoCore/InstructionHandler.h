@@ -38,8 +38,8 @@ public:
     // Szybkie rozpoznawanie komend
     CommandType GetCommandType(const std::string& command) const;
 
-    std::map<std::string, double> variables;
-    std::map<std::string, FunctionDefinition> functions;
+    std::unordered_map<std::string, double> variables;
+    std::unordered_map<std::string, FunctionDefinition> functions;
     
 private:
     Turtle& turtle;
