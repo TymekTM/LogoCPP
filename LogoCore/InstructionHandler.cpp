@@ -16,6 +16,8 @@ std::unordered_map<std::string, CommandType> Instruction::InitCommandLookup() {
         {"lewo", CommandType::Left}, {"Lewo", CommandType::Left},
         {"Right", CommandType::Right}, {"right", CommandType::Right},
         {"prawo", CommandType::Right}, {"Prawo", CommandType::Right},
+        {"penup", CommandType::PenUp}, {"PenUp", CommandType::PenUp}, {"pu", CommandType::PenUp},
+        {"pendown", CommandType::PenDown}, {"PenDown", CommandType::PenDown}, {"pd", CommandType::PenDown},
         {"var", CommandType::Var},
         {"if", CommandType::If},
         {"def", CommandType::Def}
@@ -114,6 +116,16 @@ void Instruction::HandleInstruction(const std::string& instruction, Tokenizer& t
         if (!key.empty()) {
             variables[std::move(key)] = value;
         }
+        return;
+    }
+
+    // Obsługa penup/pendown
+    if (cmdType == CommandType::PenUp) {
+        turtle.PenUp();
+        return;
+    }
+    if (cmdType == CommandType::PenDown) {
+        turtle.PenDown();
         return;
     }
 

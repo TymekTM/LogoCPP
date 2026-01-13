@@ -29,11 +29,13 @@ void Turtle::Forward(int distance)
 	double dx = cos(radians);
 	double dy = sin(radians);
 
-	for (int i = 0; i <= distance; ++i) {
-		int newX = posX + static_cast<int>(round(i * dx));
-		int newY = posY + static_cast<int>(round(i * dy));
-		
-		canvas.setPixel(newX, newY, pen);
+	if (penDown) {
+		for (int i = 0; i <= distance; ++i) {
+			int newX = posX + static_cast<int>(round(i * dx));
+			int newY = posY + static_cast<int>(round(i * dy));
+			
+			canvas.setPixel(newX, newY, pen);
+		}
 	}
 	
 	posX = posX + static_cast<int>(round(distance * dx));
@@ -50,11 +52,13 @@ void Turtle::Backward(int distance)
 	double dx = cos(radians);
 	double dy = sin(radians);
 
-	for (int i = 0; i <= distance; ++i) {
-		int newX = posX + static_cast<int>(round(i * dx));
-		int newY = posY + static_cast<int>(round(i * dy));
-		
-		canvas.setPixel(newX, newY, pen);
+	if (penDown) {
+		for (int i = 0; i <= distance; ++i) {
+			int newX = posX + static_cast<int>(round(i * dx));
+			int newY = posY + static_cast<int>(round(i * dy));
+			
+			canvas.setPixel(newX, newY, pen);
+		}
 	}
 	
 	posX = posX + static_cast<int>(round(distance * dx));
@@ -69,4 +73,14 @@ void Turtle::Left(int angle)
 void Turtle::Right(int angle)
 {
 	this->angle += angle;
+}
+
+void Turtle::PenUp()
+{
+	penDown = false;
+}
+
+void Turtle::PenDown()
+{
+	penDown = true;
 }

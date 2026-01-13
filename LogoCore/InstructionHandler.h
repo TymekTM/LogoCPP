@@ -19,6 +19,8 @@ enum class CommandType {
     Backward,
     Left,
     Right,
+    PenUp,
+    PenDown,
     Var,
     If,
     Def,
