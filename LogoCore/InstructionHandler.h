@@ -175,15 +175,15 @@ public:
     void HandleInstruction(const std::string& instruction, Tokenizer& tokenizer);
     CommandType GetCommandType(const std::string& command) const;
     void setTurtle(Turtle& t) { turtlePtr = &t; }
-    void resetVarSlots() { std::memset(varSlots, 0, sizeof(varSlots)); variables.clear(); }
+    void resetVarSlots() { std::memset(varSlots, 0, sizeof(varSlots)); }
     
     // Pre-compiled top-level instructions (skip tokenizer on re-runs)
     std::vector<CInstr> compiledTopLevel;
     bool topLevelCompiled = false;
     void compileTopLevel(const std::string& instructionSet);
 
-    // Slot-based variable storage
-    double varSlots[MAX_VARS] = {};
+    // Slot-based variable storage (cache-line aligned for hot path access)
+    alignas(64) double varSlots[MAX_VARS] = {};
     std::unordered_map<std::string, int> varNameToSlot;
     int nextSlot = 0;
     

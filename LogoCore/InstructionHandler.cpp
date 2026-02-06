@@ -386,12 +386,12 @@ void Instruction::executeCompiled(const std::vector<CInstr>& instructions) {
                 const int na = instr.nCallArgs;
                 const CExpr* __restrict args = instr.callArgs;
                 
-                double argVals[8];
-                for (int i = 0; i < np && i < na; ++i)
-                    argVals[i] = args[i].eval(vs);
-                
                 // Early exit: check if the function's body condition will be false
                 if (cf->hasEarlyExit) [[likely]] {
+                    double argVals[8];
+                    for (int i = 0; i < np && i < na; ++i)
+                        argVals[i] = args[i].eval(vs);
+                    
                     double checkVal = argVals[cf->earlyExitArgIdx];
                     bool condTrue = false;
                     switch (cf->earlyExitOp) {
@@ -419,6 +419,10 @@ void Instruction::executeCompiled(const std::vector<CInstr>& instructions) {
                     for (int i = 0; i < np; ++i)
                         vs[slots[i]] = saved[i];
                 } else [[unlikely]] {
+                    double argVals[8];
+                    for (int i = 0; i < np && i < na; ++i)
+                        argVals[i] = args[i].eval(vs);
+                    
                     const int* __restrict slots = cf->paramSlotArr;
                     double saved[8];
                     for (int i = 0; i < np; ++i) {
@@ -615,11 +619,11 @@ void Instruction::executeCompiledRaw(const CInstr* __restrict ip, int count) {
                 const int np = cf->nParams;
                 const CExpr* __restrict args = instr.callArgs;
                 
-                double argVals[8];
-                for (int i = 0; i < np && i < instr.nCallArgs; ++i)
-                    argVals[i] = args[i].eval(vs);
-                
                 if (cf->hasEarlyExit) [[likely]] {
+                    double argVals[8];
+                    for (int i = 0; i < np && i < instr.nCallArgs; ++i)
+                        argVals[i] = args[i].eval(vs);
+                    
                     double checkVal = argVals[cf->earlyExitArgIdx];
                     bool condTrue = false;
                     switch (cf->earlyExitOp) {
@@ -643,6 +647,10 @@ void Instruction::executeCompiledRaw(const CInstr* __restrict ip, int count) {
                     vs[s0] = sv0;
                     if (np >= 2) vs[s1] = sv1;
                 } else [[unlikely]] {
+                    double argVals[8];
+                    for (int i = 0; i < np && i < instr.nCallArgs; ++i)
+                        argVals[i] = args[i].eval(vs);
+                    
                     const int* __restrict slots = cf->paramSlotArr;
                     double saved[8];
                     for (int i = 0; i < np; ++i) {

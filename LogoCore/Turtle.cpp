@@ -87,6 +87,7 @@ void Turtle::drawLineSlow(int x0, int y0, int x1, int y1) {
     }
 }
 
+// Forward and Backward implementations
 void Turtle::Forward(int distance) {
     if (distance <= 0) return;
     
@@ -104,7 +105,7 @@ void Turtle::Forward(int distance) {
     if (penDown) {
         int adx = newX - posX;
         int ady = newY - posY;
-        // Fast path: movement ≤ 1 pixel in each axis → at most 2 pixels, skip Bresenham
+        // Fast path: movement <= 1 pixel in each axis -> at most 2 pixels, skip Bresenham
         if ((unsigned)(adx + 1) <= 2u && (unsigned)(ady + 1) <= 2u) [[likely]] {
             const int ox = canvas.offsetX, oy = canvas.offsetY;
             const int gw = canvas.gridWidth;
@@ -133,7 +134,7 @@ void Turtle::Backward(int distance) {
     if (distance <= 0) return;
     
     int a = angle + 180;
-    if (a >= 360) a -= 360;  // angle was in [0,360), so a is in [180,540) → just subtract 360 if needed
+    if (a >= 360) a -= 360;  // angle was in [0,360), so a is in [180,540) -> just subtract 360 if needed
     int idx = a * 10;
     
     int cs = cosTable[idx];
