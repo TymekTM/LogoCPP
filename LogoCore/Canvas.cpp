@@ -1,184 +1,159 @@
 #include "pch.h"
 #include "Canvas.h"
 #include <algorithm>
+#include <climits>
 
-Canvas::Canvas(int width, int height)
+Canvas::Canvas(int width, int height, bool skipInit)
     : initialWidth(width), initialHeight(height),
-      minUsedX(INT_MAX), maxUsedX(INT_MIN), 
-      minUsedY(INT_MAX), maxUsedY(INT_MIN),
-      hasContent(false),
-      offsetX(0), offsetY(0)
+      hasContent(false), offsetX(0), offsetY(0),
+      vecCacheDirty(true)
 {
-    // Inicjalizuj grid jako vector 2D
-    grid.resize(height);
-    for (int i = 0; i < height; ++i) {
-        grid[i].resize(width, ' ');
+    // Allocate exact size + small margin; expand dynamically as needed
+    gridWidth = width + 20;
+    gridHeight = height + 20;
+    offsetX = 10;
+    offsetY = 10;
+    grid = new char[gridWidth * gridHeight];
+    if (!skipInit) std::memset(grid, ' ', gridWidth * gridHeight);
+}
+
+Canvas::~Canvas() {
+    delete[] grid;
+}
+
+void Canvas::reset(int width, int height, bool skipInit) {
+    int newGW = width + 20;
+    int newGH = height + 20;
+    int needed = newGW * newGH;
+    if (needed > gridWidth * gridHeight) {
+        delete[] grid;
+        grid = new char[needed];
     }
+    gridWidth = newGW;
+    gridHeight = newGH;
+    offsetX = 10;
+    offsetY = 10;
+    initialWidth = width;
+    initialHeight = height;
+    hasContent = false;
+    vecCacheDirty = true;
+    if (!skipInit) std::memset(grid, ' ', gridWidth * gridHeight);
 }
 
 void Canvas::expandIfNeeded(int x, int y) {
-    // Przelicz na wewnętrzne współrzędne z uwzględnieniem offsetu
-    int internalX = x + offsetX;
-    int internalY = y + offsetY;
+    int ix = x + offsetX;
+    int iy = y + offsetY;
+
+    int newWidth = gridWidth;
+    int newHeight = gridHeight;
+    int newOffX = offsetX;
+    int newOffY = offsetY;
     
-    int currentHeight = static_cast<int>(grid.size());
-    int currentWidth = currentHeight > 0 ? static_cast<int>(grid[0].size()) : 0;
-    
-    // Rozszerzanie w dół (y >= height)
-    if (internalY >= currentHeight) {
-        int newHeight = internalY + 1 + 50;
-        grid.resize(newHeight);
-        for (int i = currentHeight; i < newHeight; ++i) {
-            grid[i].resize(currentWidth, ' ');
-        }
+    if (ix < 0) {
+        int add = -ix + 100;
+        newWidth += add;
+        newOffX += add;
+    }
+    if (ix >= gridWidth) {
+        newWidth = ix + 101;
+    }
+    if (iy < 0) {
+        int add = -iy + 100;
+        newHeight += add;
+        newOffY += add;
+    }
+    if (iy >= gridHeight) {
+        newHeight = iy + 101;
     }
     
-    // Rozszerzanie w prawo (x >= width)
-    if (internalX >= currentWidth) {
-        int newWidth = internalX + 1 + 50;
-        for (auto& row : grid) {
-            row.resize(newWidth, ' ');
-        }
-    }
-    
-    // Rozszerzanie w górę (y < 0 po przeliczeniu) - wymaga przesunięcia
-    if (internalY < 0) {
-        int addRows = -internalY + 50;
-        currentHeight = static_cast<int>(grid.size());
-        currentWidth = currentHeight > 0 ? static_cast<int>(grid[0].size()) : initialWidth;
+    if (newWidth != gridWidth || newHeight != gridHeight) {
+        char* newGrid = new char[newWidth * newHeight];
+        std::memset(newGrid, ' ', newWidth * newHeight);
         
-        std::vector<std::vector<char>> newGrid(currentHeight + addRows);
-        
-        // Nowe puste wiersze na górze
-        for (int i = 0; i < addRows; ++i) {
-            newGrid[i].resize(currentWidth, ' ');
-        }
-        // Kopiuj stare wiersze
-        for (int i = 0; i < currentHeight; ++i) {
-            newGrid[i + addRows] = std::move(grid[i]);
-        }
-        grid = std::move(newGrid);
-        
-        // Zaktualizuj offset - wszystkie Y są teraz przesunięte
-        offsetY += addRows;
-        
-        // Zaktualizuj śledzenie użytego obszaru
-        if (hasContent) {
-            minUsedY += addRows;
-            maxUsedY += addRows;
-        }
-    }
-    
-    // Rozszerzanie w lewo (x < 0 po przeliczeniu) - wymaga przesunięcia
-    if (internalX < 0) {
-        int addCols = -internalX + 50;
-        currentWidth = static_cast<int>(grid[0].size());
-        int newWidth = currentWidth + addCols;
-        
-        for (auto& row : grid) {
-            std::vector<char> newRow(newWidth, ' ');
-            for (int j = 0; j < static_cast<int>(row.size()); ++j) {
-                newRow[j + addCols] = row[j];
-            }
-            row = std::move(newRow);
+        // Copy old data
+        int dOffX = newOffX - offsetX;
+        int dOffY = newOffY - offsetY;
+        for (int row = 0; row < gridHeight; ++row) {
+            std::memcpy(newGrid + (row + dOffY) * newWidth + dOffX, 
+                       grid + row * gridWidth, gridWidth);
         }
         
-        // Zaktualizuj offset - wszystkie X są teraz przesunięte
-        offsetX += addCols;
+        delete[] grid;
+        grid = newGrid;
         
-        // Zaktualizuj śledzenie użytego obszaru
-        if (hasContent) {
-            minUsedX += addCols;
-            maxUsedX += addCols;
-        }
+        offsetX = newOffX;
+        offsetY = newOffY;
+        gridWidth = newWidth;
+        gridHeight = newHeight;
     }
 }
 
-void Canvas::setPixel(int x, int y, char c) {
-    // Automatycznie rozszerz canvas jeśli potrzeba
+void Canvas::setPixelSlow(int x, int y, char c) {
     expandIfNeeded(x, y);
-    
-    // Przelicz na wewnętrzne współrzędne
-    int internalX = x + offsetX;
-    int internalY = y + offsetY;
-    
-    if (internalY >= 0 && internalY < static_cast<int>(grid.size()) && 
-        internalX >= 0 && internalX < static_cast<int>(grid[internalY].size())) {
-        grid[internalY][internalX] = c;
-        
-        // Aktualizuj granice użytego obszaru
-        hasContent = true;
-        minUsedX = std::min(minUsedX, internalX);
-        maxUsedX = std::max(maxUsedX, internalX);
-        minUsedY = std::min(minUsedY, internalY);
-        maxUsedY = std::max(maxUsedY, internalY);
-    }
+    int ix = x + offsetX;
+    int iy = y + offsetY;
+    grid[iy * gridWidth + ix] = c;
+    hasContent = true;
 }
 
 std::vector<std::vector<char>>& Canvas::getGrid() {
-    return grid;
+    vecCache.resize(gridHeight);
+    for (int i = 0; i < gridHeight; ++i) {
+        vecCache[i].assign(grid + i * gridWidth, grid + (i + 1) * gridWidth);
+    }
+    return vecCache;
 }
 
 const std::vector<std::vector<char>>& Canvas::getGrid() const {
-    return grid;
-}
-
-int Canvas::getWidth() const {
-    return grid.empty() ? 0 : static_cast<int>(grid[0].size());
-}
-
-int Canvas::getHeight() const {
-    return static_cast<int>(grid.size());
-}
-
-int Canvas::getInitialWidth() const {
-    return initialWidth;
-}
-
-int Canvas::getInitialHeight() const {
-    return initialHeight;
+    vecCache.resize(gridHeight);
+    for (int i = 0; i < gridHeight; ++i) {
+        vecCache[i].assign(grid + i * gridWidth, grid + (i + 1) * gridWidth);
+    }
+    return vecCache;
 }
 
 void Canvas::getBounds(int& minX, int& maxX, int& minY, int& maxY) const {
-    if (!hasContent) {
-        minX = maxX = minY = maxY = 0;
-        return;
+    // Scan grid for actual content bounds
+    minX = gridWidth; maxX = -1; minY = gridHeight; maxY = -1;
+    for (int y = 0; y < gridHeight; ++y) {
+        const char* row = grid + y * gridWidth;
+        for (int x = 0; x < gridWidth; ++x) {
+            if (row[x] != ' ') {
+                if (x < minX) minX = x;
+                if (x > maxX) maxX = x;
+                if (y < minY) minY = y;
+                if (y > maxY) maxY = y;
+            }
+        }
     }
-    minX = minUsedX;
-    maxX = maxUsedX;
-    minY = minUsedY;
-    maxY = maxUsedY;
+    if (maxX < 0) { minX = maxX = minY = maxY = 0; }
 }
 
 void Canvas::trim() {
-    if (!hasContent) {
-        // Pusta plansza - zostaw jeden wiersz z jednym znakiem
-        grid.clear();
-        grid.resize(1);
-        grid[0].resize(1, ' ');
+    int minX, maxX, minY, maxY;
+    getBounds(minX, maxX, minY, maxY);
+    if (maxX < 0) {
+        delete[] grid;
+        gridWidth = 1;
+        gridHeight = 1;
+        grid = new char[1];
+        grid[0] = ' ';
         return;
     }
     
-    // Utwórz nowy grid tylko z użytym obszarem
-    int newHeight = maxUsedY - minUsedY + 1;
-    int newWidth = maxUsedX - minUsedX + 1;
+    int newW = maxX - minX + 1;
+    int newH = maxY - minY + 1;
+    char* newGrid = new char[newW * newH];
     
-    std::vector<std::vector<char>> trimmedGrid(newHeight);
-    for (int i = 0; i < newHeight; ++i) {
-        trimmedGrid[i].resize(newWidth);
-        for (int j = 0; j < newWidth; ++j) {
-            trimmedGrid[i][j] = grid[minUsedY + i][minUsedX + j];
-        }
+    for (int i = 0; i < newH; ++i) {
+        std::memcpy(newGrid + i * newW,
+                   grid + (minY + i) * gridWidth + minX, newW);
     }
     
-    grid = std::move(trimmedGrid);
-    
-    // Zaktualizuj granice i offset
-    offsetX = offsetX - minUsedX;
-    offsetY = offsetY - minUsedY;
-    maxUsedX = newWidth - 1;
-    maxUsedY = newHeight - 1;
-    minUsedX = 0;
-    minUsedY = 0;
+    delete[] grid;
+    grid = newGrid;
+    offsetX = offsetX - minX;
+    offsetY = offsetY - minY;
+    gridWidth = newW;
+    gridHeight = newH;
 }
-

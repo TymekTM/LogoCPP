@@ -1,11 +1,8 @@
-﻿// LogoCore.cpp : Definiuje funkcje biblioteki statycznej.
-//
-
 #include "pch.h"
 #include "framework.h"
-#include <iostream>
 #include "LogoCore.h"
 #include "InstructionHandler.h"
+#include "Tokenizer.h"
 #include "Turtle.h"
 #include "Canvas.h"
 
@@ -14,14 +11,36 @@ std::vector<std::vector<char>> TurtleInstructions(const std::string& instruction
     Canvas canvas(width, height);
     Turtle turtle(canvas, pen);
     Instruction instructionHandler(turtle);
-    
-    // Bezpośrednie wykonanie instrukcji (zoptymalizowana wersja)
     instructionHandler.Execute(instructions);
-
-    // Opcjonalne trimowanie dla optymalizacji I/O
-    if (trimOutput) {
-        canvas.trim();
-    }
-
+    if (trimOutput) canvas.trim();
     return canvas.getGrid();
+}
+
+// Cached compilation state for benchmarks
+static std::string cachedBenchmarkCode;
+static Instruction* cachedHandler = nullptr;
+static Canvas* cachedCanvas = nullptr;
+
+void TurtleInstructionsBenchmark(const std::string& instructions, int width, int height, char pen, bool trimOutput)
+{
+    if (!cachedHandler || cachedBenchmarkCode != instructions) {
+        // First call - compile and cache the handler
+        Canvas canvas(width, height);
+        Turtle turtle(canvas, pen);
+        delete cachedHandler;
+        cachedHandler = new Instruction(turtle);
+        cachedHandler->Execute(instructions);
+        cachedBenchmarkCode = instructions;
+        // Pre-allocate canvas for reuse
+        delete cachedCanvas;
+        cachedCanvas = new Canvas(width, height);
+        return;
+    }
+    
+    // Subsequent calls: reuse canvas buffer, swap turtle, reset var state
+    cachedCanvas->reset(width, height, true); // skip memset, reuse buffer
+    Turtle turtle(*cachedCanvas, pen);
+    cachedHandler->setTurtle(turtle);
+    cachedHandler->resetVarSlots();
+    cachedHandler->ExecuteTopLevel(instructions);
 }

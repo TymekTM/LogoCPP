@@ -1,40 +1,52 @@
 #pragma once
 #include <vector>
+#include <cstring>
+#include <algorithm>
 
 class Canvas {
 public:
-    Canvas(int width, int height);
-    void setPixel(int x, int y, char c = '*');
+    Canvas(int width, int height, bool skipInit = false);
+    ~Canvas();
+    Canvas(const Canvas&) = delete;
+    Canvas& operator=(const Canvas&) = delete;
+    
+    void reset(int width, int height, bool skipInit = false);
+    
+    inline void setPixel(int x, int y, char c = '*') {
+        int ix = x + offsetX;
+        int iy = y + offsetY;
+        if (ix >= 0 && ix < gridWidth && iy >= 0 && iy < gridHeight) [[likely]] {
+            grid[iy * gridWidth + ix] = c;
+        } else {
+            setPixelSlow(x, y, c);
+        }
+    }
     
     std::vector<std::vector<char>>& getGrid();
     const std::vector<std::vector<char>>& getGrid() const;
     
-    // Zwraca aktualny rozmiar (może być większy niż początkowy po rozszerzeniu)
-    int getWidth() const;
-    int getHeight() const;
+    int getWidth() const { return gridWidth; }
+    int getHeight() const { return gridHeight; }
+    int getInitialWidth() const { return initialWidth; }
+    int getInitialHeight() const { return initialHeight; }
     
-    // Początkowy rozmiar (do określenia środka)
-    int getInitialWidth() const;
-    int getInitialHeight() const;
-    
-    // Trimuje canvas do minimalnego prostokąta zawierającego wszystkie znaki
     void trim();
-    
-    // Zwraca granice użytego obszaru (minX, maxX, minY, maxY)
     void getBounds(int& minX, int& maxX, int& minY, int& maxY) const;
+
+    char* grid;
+    int gridWidth;
+    int gridHeight;
+    int offsetX, offsetY;
     
 private:
-    std::vector<std::vector<char>> grid;
     int initialWidth;
     int initialHeight;
     
-    // Śledzenie granic dla optymalizacji trimowania
-    int minUsedX, maxUsedX, minUsedY, maxUsedY;
     bool hasContent;
     
-    // Offset do śledzenia przesunięć przy dynamicznym rozszerzaniu
-    int offsetX, offsetY;
+    mutable std::vector<std::vector<char>> vecCache;
+    mutable bool vecCacheDirty;
     
-    // Rozszerza canvas w danym kierunku
     void expandIfNeeded(int x, int y);
+    void setPixelSlow(int x, int y, char c);
 };
