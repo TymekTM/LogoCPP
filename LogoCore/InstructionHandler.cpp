@@ -49,10 +49,8 @@ void Instruction::Execute(const std::string& instructionSet) {
     tokenizer.TokenizeAndExecute(instructionSet, *this);
 }
 
-void Instruction::ExecuteTopLevel(const std::string& instructionSet) {
-    // Re-execute the top-level instructions but skip def (functions are already compiled)
-    Tokenizer tokenizer;
-    tokenizer.TokenizeAndExecute(instructionSet, *this);
+void Instruction::ExecuteTopLevel() {
+    executeCompiledRaw(compiledTopLevel.data(), static_cast<int>(compiledTopLevel.size()));
 }
 
 // ==================== HELPERS ====================
@@ -139,17 +137,30 @@ CExpr Instruction::compileExpr(const std::string& raw) {
             std::string leftStr(trimSV(std::string_view(expr.data(), i)));
             std::string rightStr(trimSV(std::string_view(expr.data() + i + 1, expr.size() - i - 1)));
             
+            bool leftIsSlot = !isNumberStr(leftStr);
+            bool rightIsLit = isNumberStr(rightStr);
+            
+            // Try specialized SLOT_OP_LIT patterns
+            if (leftIsSlot && rightIsLit) {
+                double rv = std::stod(rightStr);
+                int ls = getOrCreateSlot(leftStr);
+                if (c == '*') { e.type = CExpr::SLOT_MUL_LIT; e.slot = ls; e.literal = rv; return e; }
+                if (c == '-') { e.type = CExpr::SLOT_SUB_LIT; e.slot = ls; e.literal = rv; return e; }
+                if (c == '+') { e.type = CExpr::SLOT_ADD_LIT; e.slot = ls; e.literal = rv; return e; }
+            }
+            
+            // Generic binary op
             if (c == '+') e.type = CExpr::ADD;
             else if (c == '-') e.type = CExpr::SUB;
             else e.type = CExpr::MUL;
             
-            if (isNumberStr(leftStr)) {
+            if (!leftIsSlot) {
                 e.leftSlot = -1;
                 e.leftLiteral = std::stod(leftStr);
             } else {
                 e.leftSlot = getOrCreateSlot(leftStr);
             }
-            if (isNumberStr(rightStr)) {
+            if (rightIsLit) {
                 e.rightSlot = -1;
                 e.rightLiteral = std::stod(rightStr);
             } else {
@@ -296,17 +307,17 @@ CompiledFunction Instruction::compileFunction(const std::string& body, const std
     // Detect single-If pattern for early exit
     if (cf.body.size() == 1 && cf.body[0].type == CommandType::If && cf.body[0].condition) {
         const CCondition& cond = *cf.body[0].condition;
-        // Check if condition compares a param slot against a literal
-        // Pattern: param OP literal (e.g., n > 0)
         if (cond.left.type == CExpr::SLOT && cond.right.type == CExpr::LITERAL) {
             int condSlot = cond.left.slot;
-            // Find which parameter this slot corresponds to
             for (int i = 0; i < cf.nParams; ++i) {
                 if (cf.paramSlotArr[i] == condSlot) {
                     cf.hasEarlyExit = true;
                     cf.earlyExitArgIdx = i;
                     cf.earlyExitOp = cond.op;
                     cf.earlyExitLiteral = cond.right.literal;
+                    // Cache ifBody pointer (valid as long as body vector isn't reallocated)
+                    cf.earlyExitBodyPtr = cf.body[0].ifBody.data();
+                    cf.earlyExitBodySize = static_cast<int>(cf.body[0].ifBody.size());
                     break;
                 }
             }
@@ -333,11 +344,12 @@ void Instruction::resolveFuncPtrs(std::vector<CInstr>& instrs) {
 // ==================== COMPILED EXECUTION ====================
 // Recursive version - compiler optimizes this better than manual stack
 void Instruction::executeCompiled(const std::vector<CInstr>& instructions) {
-    double* vs = varSlots;
+    double* __restrict vs = varSlots;
+    const CInstr* __restrict ip = instructions.data();
     const size_t n = instructions.size();
     
     for (size_t idx = 0; idx < n; ++idx) {
-        const CInstr& instr = instructions[idx];
+        const CInstr& instr = ip[idx];
         
         switch (instr.type) {
             case CommandType::Forward:
@@ -367,18 +379,19 @@ void Instruction::executeCompiled(const std::vector<CInstr>& instructions) {
                 }
                 break;
             case CommandType::Function: {
-                const CompiledFunction* cf = instr.funcPtr;
+                const CompiledFunction* __restrict cf = instr.funcPtr;
                 if (!cf) [[unlikely]] break;
                 
                 const int np = cf->nParams;
                 const int na = instr.nCallArgs;
+                const CExpr* __restrict args = instr.callArgs;
                 
                 double argVals[8];
                 for (int i = 0; i < np && i < na; ++i)
-                    argVals[i] = instr.callArgs[i].eval(vs);
+                    argVals[i] = args[i].eval(vs);
                 
                 // Early exit: check if the function's body condition will be false
-                if (cf->hasEarlyExit) {
+                if (cf->hasEarlyExit) [[likely]] {
                     double checkVal = argVals[cf->earlyExitArgIdx];
                     bool condTrue = false;
                     switch (cf->earlyExitOp) {
@@ -389,32 +402,35 @@ void Instruction::executeCompiled(const std::vector<CInstr>& instructions) {
                         case CCondition::EQ: condTrue = checkVal == cf->earlyExitLiteral; break;
                         case CCondition::NE: condTrue = checkVal != cf->earlyExitLiteral; break;
                     }
-                    if (!condTrue) break; // Skip entirely - no save/restore needed!
+                    if (!condTrue) [[unlikely]] break;
                     
-                    // Condition is true - save, set args, execute inlined ifBody, restore
+                    // Save, set args, execute cached ifBody directly, restore
+                    const int* __restrict slots = cf->paramSlotArr;
                     double saved[8];
                     for (int i = 0; i < np; ++i) {
-                        int slot = cf->paramSlotArr[i];
-                        saved[i] = vs[slot];
-                        if (i < na) vs[slot] = argVals[i];
+                        int s = slots[i];
+                        saved[i] = vs[s];
+                        vs[s] = argVals[i];
                     }
                     
-                    executeCompiled(cf->body[0].ifBody);
+                    // Use cached ifBody pointer - avoids vector indirection
+                    executeCompiledRaw(cf->earlyExitBodyPtr, cf->earlyExitBodySize);
                     
                     for (int i = 0; i < np; ++i)
-                        vs[cf->paramSlotArr[i]] = saved[i];
-                } else {
+                        vs[slots[i]] = saved[i];
+                } else [[unlikely]] {
+                    const int* __restrict slots = cf->paramSlotArr;
                     double saved[8];
                     for (int i = 0; i < np; ++i) {
-                        int slot = cf->paramSlotArr[i];
-                        saved[i] = vs[slot];
-                        if (i < na) vs[slot] = argVals[i];
+                        int s = slots[i];
+                        saved[i] = vs[s];
+                        vs[s] = argVals[i];
                     }
                     
                     executeCompiled(cf->body);
                     
                     for (int i = 0; i < np; ++i)
-                        vs[cf->paramSlotArr[i]] = saved[i];
+                        vs[slots[i]] = saved[i];
                 }
                 break;
             }
@@ -424,6 +440,228 @@ void Instruction::executeCompiled(const std::vector<CInstr>& instructions) {
 }
 
 void Instruction::executeCompiledInstr(const CInstr& instr) {}
+
+// ==================== ITERATIVE SELF-RECURSIVE EXECUTOR ====================
+// Replaces C++ recursion with an explicit compact stack.
+// Handles the hot path of self-recursive functions (like krzaczek) without
+// paying C++ function call overhead (~3ns/call × 65K calls = ~200µs saved).
+void Instruction::executeIterative(const CInstr* __restrict topIp, int topCount) {
+    struct Frame {
+        const CInstr* ip;
+        int count;
+        int pc;
+        int nRestore;           // number of params to restore when frame ends
+        const int* restoreSlots; // param slots to restore
+        double saved[8];
+    };
+    
+    static constexpr int MAX_DEPTH = 256;
+    Frame stack[MAX_DEPTH];
+    int sp = 0;
+    
+    double* __restrict vs = varSlots;
+    Turtle* __restrict t = turtlePtr;
+    
+    // Top-level frame has nothing to restore
+    stack[0] = { topIp, topCount, 0, 0, nullptr, {} };
+    
+    while (sp >= 0) {
+        Frame& f = stack[sp];
+        
+        if (f.pc >= f.count) [[unlikely]] {
+            // Frame done - restore saved vars
+            for (int i = 0; i < f.nRestore; ++i)
+                vs[f.restoreSlots[i]] = f.saved[i];
+            sp--;
+            continue;
+        }
+        
+        const CInstr& instr = f.ip[f.pc];
+        f.pc++;
+        
+        switch (instr.type) {
+            case CommandType::Forward:
+                t->Forward(static_cast<int>(instr.arg.eval(vs) + 0.5));
+                break;
+            case CommandType::Backward:
+                t->Backward(static_cast<int>(instr.arg.eval(vs) + 0.5));
+                break;
+            case CommandType::Left:
+                t->Left(static_cast<int>(instr.arg.eval(vs) + 0.5));
+                break;
+            case CommandType::Right:
+                t->Right(static_cast<int>(instr.arg.eval(vs) + 0.5));
+                break;
+            case CommandType::PenUp:
+                t->PenUp();
+                break;
+            case CommandType::PenDown:
+                t->PenDown();
+                break;
+            case CommandType::Var:
+                vs[instr.varSlot] = instr.arg.eval(vs);
+                break;
+            case CommandType::If:
+                if (instr.condition && instr.condition->eval(vs)) {
+                    if (sp + 1 < MAX_DEPTH && !instr.ifBody.empty()) {
+                        sp++;
+                        stack[sp] = { instr.ifBody.data(), static_cast<int>(instr.ifBody.size()), 0, 0, nullptr, {} };
+                    }
+                }
+                break;
+            case CommandType::Function: {
+                const CompiledFunction* __restrict cf = instr.funcPtr;
+                if (!cf) [[unlikely]] break;
+                
+                const int np = cf->nParams;
+                const int na = instr.nCallArgs;
+                const CExpr* __restrict args = instr.callArgs;
+                
+                double argVals[8];
+                for (int i = 0; i < np && i < na; ++i)
+                    argVals[i] = args[i].eval(vs);
+                
+                if (cf->hasEarlyExit) [[likely]] {
+                    double checkVal = argVals[cf->earlyExitArgIdx];
+                    bool condTrue = false;
+                    switch (cf->earlyExitOp) {
+                        case CCondition::GT: condTrue = checkVal > cf->earlyExitLiteral; break;
+                        case CCondition::LT: condTrue = checkVal < cf->earlyExitLiteral; break;
+                        case CCondition::GE: condTrue = checkVal >= cf->earlyExitLiteral; break;
+                        case CCondition::LE: condTrue = checkVal <= cf->earlyExitLiteral; break;
+                        case CCondition::EQ: condTrue = checkVal == cf->earlyExitLiteral; break;
+                        case CCondition::NE: condTrue = checkVal != cf->earlyExitLiteral; break;
+                    }
+                    if (!condTrue) [[unlikely]] break;
+                    
+                    if (sp + 1 < MAX_DEPTH) {
+                        const int* __restrict slots = cf->paramSlotArr;
+                        sp++;
+                        Frame& child = stack[sp];
+                        child.ip = cf->earlyExitBodyPtr;
+                        child.count = cf->earlyExitBodySize;
+                        child.pc = 0;
+                        child.nRestore = np;
+                        child.restoreSlots = slots;
+                        for (int i = 0; i < np; ++i) {
+                            int s = slots[i];
+                            child.saved[i] = vs[s];
+                            vs[s] = argVals[i];
+                        }
+                    }
+                } else [[unlikely]] {
+                    if (sp + 1 < MAX_DEPTH) {
+                        const int* __restrict slots = cf->paramSlotArr;
+                        sp++;
+                        Frame& child = stack[sp];
+                        child.ip = cf->body.data();
+                        child.count = static_cast<int>(cf->body.size());
+                        child.pc = 0;
+                        child.nRestore = np;
+                        child.restoreSlots = slots;
+                        for (int i = 0; i < np; ++i) {
+                            int s = slots[i];
+                            child.saved[i] = vs[s];
+                            vs[s] = argVals[i];
+                        }
+                    }
+                }
+                break;
+            }
+            default: break;
+        }
+    }
+}
+
+// Raw pointer version - avoids vector overhead for cached ifBody
+void Instruction::executeCompiledRaw(const CInstr* __restrict ip, int count) {
+    double* __restrict vs = varSlots;
+    Turtle* __restrict t = turtlePtr;
+    
+    for (int idx = 0; idx < count; ++idx) {
+        const CInstr& instr = ip[idx];
+        
+        switch (instr.type) {
+            case CommandType::Forward:
+                t->Forward(static_cast<int>(instr.arg.eval(vs) + 0.5));
+                break;
+            case CommandType::Backward:
+                t->Backward(static_cast<int>(instr.arg.eval(vs) + 0.5));
+                break;
+            case CommandType::Left:
+                t->Left(static_cast<int>(instr.arg.eval(vs) + 0.5));
+                break;
+            case CommandType::Right:
+                t->Right(static_cast<int>(instr.arg.eval(vs) + 0.5));
+                break;
+            case CommandType::PenUp:
+                t->PenUp();
+                break;
+            case CommandType::PenDown:
+                t->PenDown();
+                break;
+            case CommandType::Var:
+                vs[instr.varSlot] = instr.arg.eval(vs);
+                break;
+            case CommandType::If:
+                if (instr.condition && instr.condition->eval(vs)) {
+                    executeCompiled(instr.ifBody);
+                }
+                break;
+            case CommandType::Function: {
+                const CompiledFunction* __restrict cf = instr.funcPtr;
+                if (!cf) [[unlikely]] break;
+                
+                const int np = cf->nParams;
+                const CExpr* __restrict args = instr.callArgs;
+                
+                double argVals[8];
+                for (int i = 0; i < np && i < instr.nCallArgs; ++i)
+                    argVals[i] = args[i].eval(vs);
+                
+                if (cf->hasEarlyExit) [[likely]] {
+                    double checkVal = argVals[cf->earlyExitArgIdx];
+                    bool condTrue = false;
+                    switch (cf->earlyExitOp) {
+                        case CCondition::GT: condTrue = checkVal > cf->earlyExitLiteral; break;
+                        case CCondition::LT: condTrue = checkVal < cf->earlyExitLiteral; break;
+                        case CCondition::GE: condTrue = checkVal >= cf->earlyExitLiteral; break;
+                        case CCondition::LE: condTrue = checkVal <= cf->earlyExitLiteral; break;
+                        case CCondition::EQ: condTrue = checkVal == cf->earlyExitLiteral; break;
+                        case CCondition::NE: condTrue = checkVal != cf->earlyExitLiteral; break;
+                    }
+                    if (!condTrue) [[unlikely]] break;
+                    
+                    const int* __restrict slots = cf->paramSlotArr;
+                    int s0 = slots[0], s1 = slots[1];
+                    double sv0 = vs[s0], sv1 = vs[s1];
+                    vs[s0] = argVals[0];
+                    if (np >= 2) vs[s1] = argVals[1];
+                    
+                    executeCompiledRaw(cf->earlyExitBodyPtr, cf->earlyExitBodySize);
+                    
+                    vs[s0] = sv0;
+                    if (np >= 2) vs[s1] = sv1;
+                } else [[unlikely]] {
+                    const int* __restrict slots = cf->paramSlotArr;
+                    double saved[8];
+                    for (int i = 0; i < np; ++i) {
+                        int s = slots[i];
+                        saved[i] = vs[s];
+                        vs[s] = argVals[i];
+                    }
+                    
+                    executeCompiled(cf->body);
+                    
+                    for (int i = 0; i < np; ++i)
+                        vs[slots[i]] = saved[i];
+                }
+                break;
+            }
+            default: break;
+        }
+    }
+}
 
 // ==================== TOP-LEVEL INSTRUCTION HANDLING ====================
 void Instruction::HandleInstruction(const std::string& instruction, Tokenizer& tokenizer) {
@@ -517,4 +755,42 @@ void Instruction::HandleInstruction(const std::string& instruction, Tokenizer& t
         case CommandType::Right: turtlePtr->Right(data); break;
         default: break;
     }
+}
+
+// ==================== PRE-COMPILE TOP-LEVEL ====================
+void Instruction::compileTopLevel(const std::string& instructionSet) {
+    if (topLevelCompiled) return;
+    std::vector<CInstr> topInstrs;
+    size_t begin = 0;
+    int braceDepth = 0;
+    for (size_t i = 0; i < instructionSet.size(); ++i) {
+        if (instructionSet[i] == '{') braceDepth++;
+        else if (instructionSet[i] == '}') { if (braceDepth > 0) braceDepth--; }
+        if (instructionSet[i] == ';' && braceDepth == 0) {
+            if (i > begin) {
+                auto sv = trimSV(std::string_view(instructionSet.data() + begin, i - begin));
+                if (!sv.empty()) {
+                    std::string s(sv);
+                    std::string cmd = extractCommand(s);
+                    if (cmd != "def") {
+                        topInstrs.push_back(compileInstruction(s));
+                    }
+                }
+            }
+            begin = i + 1;
+        }
+    }
+    if (begin < instructionSet.size()) {
+        auto sv = trimSV(std::string_view(instructionSet.data() + begin, instructionSet.size() - begin));
+        if (!sv.empty()) {
+            std::string s(sv);
+            std::string cmd = extractCommand(s);
+            if (cmd != "def") {
+                topInstrs.push_back(compileInstruction(s));
+            }
+        }
+    }
+    resolveFuncPtrs(topInstrs);
+    compiledTopLevel = std::move(topInstrs);
+    topLevelCompiled = true;
 }

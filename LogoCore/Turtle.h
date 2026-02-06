@@ -6,8 +6,16 @@ public:
     Turtle(Canvas& canvas, char pen);
     void Forward(int distance);
     void Backward(int distance);
-    void Left(int angle) { this->angle -= angle; }
-    void Right(int angle) { this->angle += angle; }
+    void Left(int angle) {
+        this->angle -= angle;
+        if (this->angle < 0) this->angle += 360;
+        else if (this->angle >= 360) this->angle -= 360;
+    }
+    void Right(int angle) {
+        this->angle += angle;
+        if (this->angle >= 360) this->angle -= 360;
+        else if (this->angle < 0) this->angle += 360;
+    }
     void PenUp() { penDown = false; }
     void PenDown() { penDown = true; }
     
@@ -22,8 +30,11 @@ private:
     int angle = 0;
     bool penDown = true;
     
-    // Precomputed sin/cos tables (x1000 fixed point)
+    // Precomputed sin/cos tables (x8192 fixed point, power-of-2 for fast shift)
     static constexpr int TABLE_SIZE = 3600; // 0.1 degree precision
+    static constexpr int TRIG_SHIFT = 13;   // 2^13 = 8192
+    static constexpr int TRIG_SCALE = 1 << TRIG_SHIFT;  // 8192
+    static constexpr int TRIG_HALF = TRIG_SCALE >> 1;    // 4096
     static int sinTable[TABLE_SIZE];
     static int cosTable[TABLE_SIZE];
     static bool tablesInitialized;

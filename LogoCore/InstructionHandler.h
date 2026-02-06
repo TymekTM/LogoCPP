@@ -16,20 +16,27 @@ static constexpr int MAX_STACK = 256;
 
 // ==================== COMPILED EXPRESSION ====================
 struct CExpr {
-    enum Type : uint8_t { LITERAL, SLOT, ADD, SUB, MUL } type = LITERAL;
+    enum Type : uint8_t {
+        LITERAL, SLOT,
+        SLOT_ADD_LIT, SLOT_SUB_LIT, SLOT_MUL_LIT,  // common specializations
+        ADD, SUB, MUL  // generic binary ops
+    } type = LITERAL;
     double literal = 0.0;
-    int slot = -1;           // for SLOT type
+    int slot = -1;           // for SLOT type and SLOT_*_LIT types
     
-    // For binary ops
-    int leftSlot = -1;       // -1 means use leftLiteral  
+    // For generic binary ops only
+    int leftSlot = -1;
     double leftLiteral = 0.0;
-    int rightSlot = -1;      // -1 means use rightLiteral
+    int rightSlot = -1;
     double rightLiteral = 0.0;
     
-    inline double eval(const double* vars) const noexcept {
+    __forceinline double eval(const double* __restrict vars) const noexcept {
         switch (type) {
             case LITERAL: return literal;
             case SLOT: return vars[slot];
+            case SLOT_MUL_LIT: return vars[slot] * literal;
+            case SLOT_SUB_LIT: return vars[slot] - literal;
+            case SLOT_ADD_LIT: return vars[slot] + literal;
             case ADD: {
                 double l = (leftSlot >= 0) ? vars[leftSlot] : leftLiteral;
                 double r = (rightSlot >= 0) ? vars[rightSlot] : rightLiteral;
@@ -55,7 +62,7 @@ struct CCondition {
     CExpr left, right;
     enum Op : uint8_t { GT, LT, GE, LE, EQ, NE } op = GT;
     
-    inline bool eval(const double* vars) const noexcept {
+    __forceinline bool eval(const double* __restrict vars) const noexcept {
         double l = left.eval(vars);
         double r = right.eval(vars);
         switch (op) {
@@ -71,7 +78,7 @@ struct CCondition {
 };
 
 // ==================== COMPILED INSTRUCTION ====================
-enum class CommandType {
+enum class CommandType : uint8_t {
     Unknown, Forward, Backward, Left, Right,
     PenUp, PenDown, Var, If, Def, Function
 };
@@ -81,7 +88,7 @@ struct CompiledFunction; // forward declaration
 struct CInstr {
     CommandType type = CommandType::Unknown;
     CExpr arg;
-    std::string funcName;                // for func ptr resolution
+    std::string funcName;                // for func ptr resolution (only used during compilation)
     const CompiledFunction* funcPtr = nullptr; // cached pointer for Function
     CExpr* callArgs = nullptr;           // heap-allocated call args (Function only)
     int nCallArgs = 0;
@@ -90,7 +97,8 @@ struct CInstr {
     int varSlot = -1;                    // for var assignment
     
     CInstr() = default;
-    CInstr(const CInstr& o) : type(o.type), arg(o.arg), funcName(o.funcName), funcPtr(o.funcPtr),
+    CInstr(const CInstr& o) : type(o.type), arg(o.arg),
+        funcName(o.funcName), funcPtr(o.funcPtr),
         nCallArgs(o.nCallArgs), ifBody(o.ifBody), varSlot(o.varSlot) {
         if (o.callArgs && o.nCallArgs > 0) {
             callArgs = new CExpr[o.nCallArgs];
@@ -100,7 +108,8 @@ struct CInstr {
             condition = new CCondition(*o.condition);
         }
     }
-    CInstr(CInstr&& o) noexcept : type(o.type), arg(o.arg), funcName(std::move(o.funcName)), funcPtr(o.funcPtr),
+    CInstr(CInstr&& o) noexcept : type(o.type), arg(o.arg),
+        funcName(std::move(o.funcName)), funcPtr(o.funcPtr),
         callArgs(o.callArgs), nCallArgs(o.nCallArgs),
         condition(o.condition), ifBody(std::move(o.ifBody)), varSlot(o.varSlot) {
         o.callArgs = nullptr;
@@ -109,7 +118,8 @@ struct CInstr {
     CInstr& operator=(const CInstr& o) {
         if (this == &o) return *this;
         delete[] callArgs; delete condition;
-        type = o.type; arg = o.arg; funcName = o.funcName; funcPtr = o.funcPtr;
+        type = o.type; arg = o.arg;
+        funcName = o.funcName; funcPtr = o.funcPtr;
         nCallArgs = o.nCallArgs; ifBody = o.ifBody; varSlot = o.varSlot;
         callArgs = nullptr; condition = nullptr;
         if (o.callArgs && o.nCallArgs > 0) {
@@ -122,7 +132,8 @@ struct CInstr {
     CInstr& operator=(CInstr&& o) noexcept {
         if (this == &o) return *this;
         delete[] callArgs; delete condition;
-        type = o.type; arg = o.arg; funcName = std::move(o.funcName); funcPtr = o.funcPtr;
+        type = o.type; arg = o.arg;
+        funcName = std::move(o.funcName); funcPtr = o.funcPtr;
         callArgs = o.callArgs; nCallArgs = o.nCallArgs;
         condition = o.condition; ifBody = std::move(o.ifBody); varSlot = o.varSlot;
         o.callArgs = nullptr; o.condition = nullptr;
@@ -143,6 +154,10 @@ struct CompiledFunction {
     int earlyExitArgIdx = -1;       // which call arg to check
     CCondition::Op earlyExitOp = CCondition::GT;
     double earlyExitLiteral = 0.0;  // RHS literal
+    
+    // Cached ifBody pointer for early exit (avoids vector indirection)
+    const CInstr* earlyExitBodyPtr = nullptr;
+    int earlyExitBodySize = 0;
 };
 
 // Legacy function definition
@@ -156,11 +171,16 @@ class Instruction {
 public:
     Instruction(Turtle& turtle);
     void Execute(const std::string& instructionSet);
-    void ExecuteTopLevel(const std::string& instructionSet); // Execute using pre-compiled functions
+    void ExecuteTopLevel(); // Execute pre-compiled top-level instructions directly
     void HandleInstruction(const std::string& instruction, Tokenizer& tokenizer);
     CommandType GetCommandType(const std::string& command) const;
     void setTurtle(Turtle& t) { turtlePtr = &t; }
     void resetVarSlots() { std::memset(varSlots, 0, sizeof(varSlots)); variables.clear(); }
+    
+    // Pre-compiled top-level instructions (skip tokenizer on re-runs)
+    std::vector<CInstr> compiledTopLevel;
+    bool topLevelCompiled = false;
+    void compileTopLevel(const std::string& instructionSet);
 
     // Slot-based variable storage
     double varSlots[MAX_VARS] = {};
@@ -175,6 +195,8 @@ public:
     
     // Compiled execution
     void executeCompiled(const std::vector<CInstr>& instructions);
+    void executeCompiledRaw(const CInstr* instructions, int count);
+    void executeIterative(const CInstr* instructions, int count); // self-recursive optimizer
     
 private:
     Turtle* turtlePtr;

@@ -30,6 +30,8 @@ void TurtleInstructionsBenchmark(const std::string& instructions, int width, int
         delete cachedHandler;
         cachedHandler = new Instruction(turtle);
         cachedHandler->Execute(instructions);
+        // Pre-compile top-level instructions for direct execution
+        cachedHandler->compileTopLevel(instructions);
         cachedBenchmarkCode = instructions;
         // Pre-allocate canvas for reuse
         delete cachedCanvas;
@@ -42,5 +44,5 @@ void TurtleInstructionsBenchmark(const std::string& instructions, int width, int
     Turtle turtle(*cachedCanvas, pen);
     cachedHandler->setTurtle(turtle);
     cachedHandler->resetVarSlots();
-    cachedHandler->ExecuteTopLevel(instructions);
+    cachedHandler->ExecuteTopLevel(); // Direct compiled execution - no tokenizer!
 }
