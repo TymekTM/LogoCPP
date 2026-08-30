@@ -1,7 +1,7 @@
 # LogoCPP
 
 A simple Logo interpreter with a turtle that draws a path into a text file. The program reads a `.logo` file, executes instructions, and writes the result as a character grid (by default `*` and spaces).  
-Semester project written in 4 nights — lightweight, pragmatic, and focused on getting things done.
+Semester project written in 4 nights - lightweight, pragmatic, and focused on getting things done.
 
 ## ✨ Quick start
 
@@ -18,15 +18,20 @@ Semester project written in 4 nights — lightweight, pragmatic, and focused on 
 
 Syntax:
 
-- `-i <input_file>` — `.logo` input file
-- `-o <output_file>` — output file (text grid)
-- `-s <size>` — canvas/board size (e.g., `100`)
-- `-t` — trim output to the minimal bounding box (faster output)
-- `-b <N>` — benchmark mode: run N iterations and report time (no I/O)
+- `-i <input_file>` - `.logo` input file
+- `-o <output_file>` - output file (text grid)
+- `-s <size>` - canvas/board size (e.g., `100`)
+- `-t` - trim output to the minimal bounding box (faster output)
+- `-j` - run via the native JIT: compile Logo to x86-64 machine code
+- `-b <N>` - benchmark mode: run N iterations and report time (no I/O)
 
 Example:
 
 - `LogoCPP -i example_input.logo -o output.txt -s 100`
+
+The program has three execution paths: the streaming tokenizer interpreter
+(default), the bytecode executor, and the native JIT (`-j`). Benchmark mode
+(`-b`) always uses the fastest available path (JIT).
 
 ## 🧠 Input format & syntax
 
@@ -64,25 +69,41 @@ right(90);
 forward(10);
 ```
 
-## ⚡ Performance vs Python
+## ⚡ Performance
 
-This is a C++ implementation, so it will **typically** be noticeably faster than an equivalent interpreter written in Python — especially for large inputs or many iterations. The parser also works in a streaming way (no heavy AST), which reduces overhead.
+The headline numbers (recursive fractal tree, depth 15, one desktop CPU,
+2026-08 - full table and methodology in [tests/compare/RESULTS.md](tests/compare/RESULTS.md)):
 
-I’m not listing “magic” numbers because performance depends heavily on hardware and the specific program. Instead, you can:
+| Implementation | n=15 | LogoCPP JIT is |
+|---|---:|---:|
+| Python stdlib turtle (Tk) | 375 ms | ~1320x faster |
+| Pure CPython, same algorithm | 35.4 ms | ~124x faster |
+| Straightforward hand-written C++ | 373 us | 1.3x faster |
+| LogoCPP bytecode executor | 614 us | 2.2x faster |
+| **LogoCPP JIT** | **285 us** | - |
 
-1. Run benchmark mode (`-b N`), which measures **only** parsing and execution (no I/O).
-2. Compare the timing with a Python version of the same program.
+The JIT beats even a hand-written C++ recursion that calls the same
+`Turtle`/`Canvas`: it hoists the `if (n > 0)` recursion guard to call sites
+(leaf calls never execute) and inlines turtle moves into straight-line code
+with fixed-point trig tables pinned in registers.
 
-Benchmark example:
+Numbers are machine-specific. Reproduce them with:
 
-- `LogoCPP -i tests/performance_test.logo -o output.txt -s 200 -b 100`
+- `python tests/bench.py` - LogoCPP, best of 5 runs
+- `python tests/compare/tree_py_turtle.py 15` - Python stdlib turtle
+- `python tests/compare/tree_py_grid.py 15` - pure CPython port
+- `tests\compare\build_handwritten.bat && tests\compare\handwritten.exe 15` - C++ reference
+
+The design and optimization journey (what worked, what regressed, and why)
+is documented in [CASE_STUDY.md](CASE_STUDY.md).
 
 ## 📂 Useful files
 
-- `example_input.logo` — simple input example
-- `tests/performance_test*.logo` — heavier programs for performance tests
-- `x64/Release/output.txt` — example output
+- `example_input.logo` - simple input example
+- `tests/` - regression suite (`run_tests.py`), benchmarks (`bench.py`), comparison scripts (`compare/`)
+- `tests/performance_test*.logo` - heavier programs for performance tests
+- `CASE_STUDY.md` - the 1x → 370x optimization write-up (PL)
 
 ## 📄 License
 
-MIT — see `LICENSE` for details.
+MIT - see `LICENSE` for details.

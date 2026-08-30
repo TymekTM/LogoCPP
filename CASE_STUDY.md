@@ -1,8 +1,8 @@
-# Case Study: Optymalizacja interpretera Logo z 1x do 1600x+
+# Case Study: Optymalizacja interpretera Logo z 1x do 370x (i 1320x nad Python turtle)
 
 ## Streszczenie
 
-Projekt LogoCPP — interpreter języka Logo z rysowaniem żółwia — został zoptymalizowany z **~1ms (n=8)** do **~0.01ms**, osiągając **~100x** przyspieszenie dla prostych testów i **1600x+** przewagę nad Python turtle dla głębokiej rekurencji (n=15). Poniżej opisuję każdą technikę, co zadziałało, co nie zadziałało, i dlaczego.
+Projekt LogoCPP - interpreter języka Logo z rysowaniem żółwia - był optymalizowany w dwóch fazach. Faza I (bytecode): z **~1ms (n=8)** do **~0.01ms**, ~100x. Faza II (JIT): kompilacja Logo do natywnego kodu x86-64, kolejne **1.7-2.2x** nad bytecode. Łącznie **~372x** nad oryginałem dla n=15, **~1320x** nad Python turtle (Tk) i **1.3x szybciej niż ręcznie pisana rekurencja w C++** korzystająca z tej samej biblioteki Turtle. Poniżej opisuję każdą technikę, co zadziałało, co nie zadziałało, i dlaczego.
 
 ---
 
@@ -15,7 +15,7 @@ Execute(string) → Tokenizer → HandleInstruction → Turtle ops
                      ↑ parsowanie przy każdym wywołaniu
 ```
 
-**Koszt**: `std::string` copy, `std::stod()`, `unordered_map` lookup na zmienne — wszystko ×65536 razy dla `krzaczek(50, 15)`.
+**Koszt**: `std::string` copy, `std::stod()`, `unordered_map` lookup na zmienne - wszystko ×65536 razy dla `krzaczek(50, 15)`.
 
 **Baseliny**:
 | Test | Oryginał |
@@ -43,14 +43,14 @@ struct CInstr {
 
 Kluczowe decyzje:
 - **Slot-based variables**: `double varSlots[64]` zamiast `unordered_map<string, double>`. Zamiana hash-map lookup (~20ns) na array index (~1ns).
-- **Specialized expression types**: `SLOT_MUL_LIT`, `SLOT_SUB_LIT`, `SLOT_ADD_LIT` — specjalizacje dla najczęstszych wzorców (`x*0.75`, `n-1`). Eliminują generyczny binary-op dispatch.
+- **Specialized expression types**: `SLOT_MUL_LIT`, `SLOT_SUB_LIT`, `SLOT_ADD_LIT` - specjalizacje dla najczęstszych wzorców (`x*0.75`, `n-1`). Eliminują generyczny binary-op dispatch.
 - **Pre-resolved function pointers**: Zamiast `compiledFunctions.find(funcName)` przy każdym wywołaniu, pointer jest cache'owany w `CInstr`.
 
 **Lekcja**: Parsing i name resolution to hidden killers w interpreterach. Kompilacja do bytecode (nawet najprostsza) daje rząd wielkości.
 
 ### 2.2 Early Exit Optimization (+20-40%)
 
-Wzorzec `def krzaczek(x, n) { if (n > 0) { ... } }` — ciało to jeden `if` z warunkiem na parametr vs literał.
+Wzorzec `def krzaczek(x, n) { if (n > 0) { ... } }` - ciało to jeden `if` z warunkiem na parametr vs literał.
 
 ```cpp
 if (cf->hasEarlyExit) {
@@ -73,7 +73,7 @@ Przy głębokiej rekurencji, `x*0.75^15 ≈ 0.67` → forward(1) rysuje 1-2 piks
 
 ```cpp
 if ((unsigned)(adx + 1) <= 2u && (unsigned)(ady + 1) <= 2u) [[likely]] {
-    // Direct pixel write — skip entire Bresenham setup
+    // Direct pixel write - skip entire Bresenham setup
     g[iy0 * gw + ix0] = pen;
     if (adx | ady) g[iy1 * gw + ix1] = pen;
 } else {
@@ -131,11 +131,11 @@ void TurtleInstructionsBenchmark(...) {
 
 ### 2.7 Inne drobne optymalizacje
 
-- `__forceinline` na `CExpr::eval()` — eliminuje call overhead na gorącej ścieżce
-- `__restrict` na wskaźnikach (`varSlots`, `ip`, `turtlePtr`) — umożliwia alias analysis
+- `__forceinline` na `CExpr::eval()` - eliminuje call overhead na gorącej ścieżce
+- `__restrict` na wskaźnikach (`varSlots`, `ip`, `turtlePtr`) - umożliwia alias analysis
 - Partially unrolled 2-param save/restore (zamiast generic loop)
-- `alignas(64)` na varSlots — wyrównanie do cache line
-- Skip `variables.clear()` w `resetVarSlots()` — compiled path nie używa legacy mapy
+- `alignas(64)` na varSlots - wyrównanie do cache line
+- Skip `variables.clear()` w `resetVarSlots()` - compiled path nie używa legacy mapy
 
 ---
 
@@ -225,7 +225,7 @@ Użytkownik na swoim sprzęcie osiągnął **1562x** na n=15.
 
 3. **Data distribution matters**: Odkrycie że ~88% ruchów to ≤1px pozwoliło na short-line fast path, który dał +13%.
 
-4. **Nie pomagaj kompilatorowi wbrew profilowi**: Większe switch tables, forced inlining, lazy eval — wszystko to "pomaganie" kompilatorowi, które kontruje z PGO's optymalnymi decyzjami.
+4. **Nie pomagaj kompilatorowi wbrew profilowi**: Większe switch tables, forced inlining, lazy eval - wszystko to "pomaganie" kompilatorowi, które kontruje z PGO's optymalnymi decyzjami.
 
 5. **Mierz, nie zgaduj**: Każda "oczywista" optymalizacja (AVX2! mniej switch case'ów! lazy eval!) wymagała empirycznej weryfikacji. 50% prób skończyło się regresją.
 
@@ -235,7 +235,7 @@ Użytkownik na swoim sprzęcie osiągnął **1562x** na n=15.
 
 ---
 
-## 6. Architektura końcowa
+## 6. Architektura po fazie I (bytecode)
 
 ```
 Source code (string)
@@ -258,4 +258,77 @@ executeCompiledRaw() ← hot path
 
 ---
 
-*Case study sporządzony na podstawie sesji optymalizacyjnych LogoCPP, luty 2026.*
+# Faza II: Kompilator JIT (bytecode → kod maszynowy x86-64)
+
+Faza I kończyła się wnioskiem, że dalej niż ~170x nie zajdziemy bez "fundamentalnej zmiany architektury". Faza II to właśnie ta zmiana: bytecode nie jest już interpretowany przez switch w C++, tylko kompilowany do natywnego kodu x86-64 emitowanego ręcznie bajt po bajcie.
+
+## 7. Co zadziałało w JIT (w kolejności commitów)
+
+### 7.1 Kompilator do kodu maszynowego (cb44297, +18-52% nad bytecode)
+
+Ręczny emitter bajtów x86-64 (`Jit.cpp`): każda funkcja Logo kompiluje się do bloku kodu, wywołania przez `call rel32`, stałe double w puli RIP-relative, argumenty w `xmm0-3`, zmienne w tablicy `double[64]` wskazywanej przez `rdx`. Pamięć: `VirtualAlloc` RWX, po emisji przełączenie na RX.
+
+Wynik od razu: **n=8 +52%, n=12 +24%, n=15 +18%** nad bytecode. Mniej niż esperowane "usuwanie dispatchu da 2x", bo interpreter C++ z PGO był już bardzo dobry - dispatch to tylko część kosztu.
+
+### 7.2 Szybkie ścieżki linii osiowych i diagonalnych (2c62c47, +5-37%)
+
+Przy rekurencji `x*0.75^k` większość linii to 1-2 piksele, ale te dłuższe często są poziome/pionowe/diagonalne. Dodałem rozgałęzienie w `drawLine` omijające pełny Bresenham dla dx==0, dy==0, dx==±dy, plus branchless rounding (`(v + HALF + (v >> 31)) >> SHIFT` zamiast if/else w `Forward`).
+
+**n=8 1.37x, n=12 1.09x, n=15 1.05x** - zmiana w C++ `Turtle`, więc przyspieszyły wszystkie trzy ścieżki wykonania (interpreter, bytecode, JIT).
+
+### 7.3 Guard early-exit na miejscu wywołania (917764e, +4-9%)
+
+W bytecode early-exit działał *wewnątrz* wywoływanej funkcji: wchodziliśmy w frame, ewaluowaliśmy argumenty, sprawdzaliśmy waruneczek. W JIT warunek `if (n > 0)` z ciała funkcji jest hoistowany na **miejsce wywołania**: `comisd` argumentu z literałem + `jcc` omijający cały `call`. Liście rekurencji (połowa wywołań w drzewie binarnym) nie wykonują się wcale - zero frame'u, zero ewaluacji argumentów.
+
+Do tego prolog rezerwuje home space raz (zamiast `sub rsp, 0x20` przed każdym `call`).
+
+**n=8 1.06x, n=12 1.04x, n=15 1.09x.**
+
+### 7.4 Pełny inline Forward/Backward (9b97699, +15% na n=15)
+
+Ostatni krok: wywołania C++ `Turtle::Forward` zastąpione emitowanym kodem - trygonometria stałoprzecinkowa przez tabele adresowane rejestrami `r14`/`r15` (wskaźniki na `cosTable`/`sinTable` ładowane raz w prologu programu), ruchy sub-pikselowe zapisywane wprost do gridu, dłuższe linie przez wywołanie helpera. Ścieżka gorąca nie opuszcza kodu JIT od prologu do epilogu.
+
+**n=15 1.15x (351→304µs), n=12 1.07x**, ale **n=8 ~5% regresji** (4.90→5.25µs): przy płaskiej rekurencji dodatkowy kod sprawdzenia okna pikselowego kosztuje więcej niż oszczędność wywołania. Zgodnie z zasadą "mierz, nie zgaduj" - udokumentowane i zaakceptowane, bo n=15 to cel główny.
+
+### 7.5 Suma fazy II
+
+| Test | Bytecode (1286b5e) | JIT (9b97699) | Przyspieszenie |
+|------|--------------------|---------------|----------------|
+| n=8 | 8.43µs | 5.02µs | **1.68x** |
+| n=12 | 88.5µs | 47.8µs | **1.85x** |
+| n=15 | 613.6µs | 284.5µs | **2.16x** |
+
+Łącznie z fazą I: n=15 z 105.8ms do 284.5µs = **372x**.
+
+## 8. Porównanie z innymi implementacjami
+
+Ten sam program (drzewo rekurencyjne) przepisany wprost do Python turtle (Tk), czystego CPythona (ten sam model gridu i trygonometria stałoprzecinkowa) i ręcznego C++ na tej samej bibliotece Turtle/Canvas. Pełna metodologia: `tests/compare/RESULTS.md`.
+
+| Implementacja | n=8 | n=12 | n=15 | LogoCPP JIT szybszy o |
+|---|---:|---:|---:|---:|
+| Python turtle (Tk, tracer off) | 2.46ms | 37.8ms | 375.5ms | **~1320x** (n=15) |
+| Czysty CPython (ten sam algorytm) | 0.56ms | 5.6ms | 35.4ms | ~124x |
+| Oryginalny interpreter (tokenizer) | 0.97ms | 13.7ms | 105.8ms | ~372x |
+| Ręczne C++ (ta sama Turtle/Canvas, /O2) | 14.4µs | 118.8µs | 372.6µs | **1.3-2.9x** |
+| Bytecode (faza I) | 8.4µs | 88.5µs | 613.6µs | 1.7-2.2x |
+| **LogoCPP JIT** | **5.0µs** | **47.8µs** | **284.5µs** | - |
+
+Najciekawszy wiersz: **JIT wygrywa z ręcznie pisanym C++**, które woła tę samą `Turtle::Forward`. Dwa triki kompilatora, których człowiek zwykle by nie napisał:
+1. guard rekurencji na miejscu wywołania (liście nigdy się nie wykonują),
+2. pełny inline ruchów z tabelami w rejestrach.
+
+Uczciwie: ręczne C++ z tymi samymi trikami prawdopodobnie dorównałoby JIT. Twierdzenie brzmi "wygrywa z kodem, który kompetentny człowiek pisze w 5 minut", nie "wygrywa z każdym możliwym C++".
+
+## 9. Wnioski z fazy II
+
+1. **Interpreter z PGO to twardy przeciwnik**: sam JIT (7.1) dał tylko +18-52%, bo switch-dispatch z PGO to nie główny koszt. Dopiero optymalizacje *pod* dispatchem (7.3, 7.4) odblokowały pełne 2.2x.
+
+2. **Kompilator może wygrać z człowiekiem przez triki, które człowiek uważa za "nie warte zachodu"**: hoisting jednego ifa na miejsce wywołania brzmi trywialnie, a daje 9% i połowę wykonanych wywołań za darmo.
+
+3. **Ręczna emisja x86-64 to pole min**: cztery z debugowanych crashy to źle policzone bity REX (W=8, R=4, X=2, B=1) albo ModRM z przypadkiem ustawionym bitem disp32. Capstone do deasemblacji jit_dump.bin był rozstrzygającym narzędziem - printowanie hexów nie wystarcza.
+
+4. **Regresje na jednym teście mogą być dobre**: 7.4 przyspiesza n=15 o 15% kosztem 5% na n=8. Bez suitu regresyjnego (26 testów, tryb podwójny) taką zmianę by się odrzuciło albo nie zauważyło.
+
+---
+
+*Case study sporządzono na podstawie sesji optymalizacyjnych LogoCPP (faza I: luty 2026, faza II: sierpień 2026). Pomiarów dokonano na `tests/bench.py` (best-of-5) i `tests/compare/`.*
