@@ -99,15 +99,21 @@ std::string Tokenizer::ExtractCommand(const std::string& input) {
     return std::string(TrimView(t.substr(0, cmdEnd)));
 }
 
-std::pair<std::string, double> Tokenizer::VariableHandler(const std::string& input) {
+std::pair<std::string, double> Tokenizer::VariableHandler(const std::string& input, const std::unordered_map<std::string, double>& variables) {
     std::string_view trimmedInput = TrimView(input);
     size_t equalPos = trimmedInput.find('=');
     if (equalPos == std::string_view::npos) return {"", 0.0};
 
     std::string_view varNameView = TrimView(trimmedInput.substr(0, equalPos));
     std::string_view varValueView = TrimView(trimmedInput.substr(equalPos + 1));
-    
-    return {std::string(varNameView), std::stod(std::string(varValueView))};
+
+    // RHS may be a literal, a variable, or an arithmetic expression over both
+    std::string valStr(varValueView);
+    double value;
+    if (IsArithmetic(valStr)) value = ArithmericHandler(valStr, variables);
+    else value = ParsingHelper::ParseValue(valStr, variables);
+
+    return {std::string(varNameView), value};
 }
 
 bool Tokenizer::IsArithmetic(const std::string& input) const noexcept {

@@ -730,7 +730,7 @@ void Instruction::HandleInstruction(const std::string& instruction, Tokenizer& t
     }
 
     if (cmdType == CommandType::Var) {
-        auto [key, value] = tokenizer.VariableHandler(instruction);
+        auto [key, value] = tokenizer.VariableHandler(instruction, variables);
         if (!key.empty()) {
             variables[key] = value;
             varSlots[getOrCreateSlot(key)] = value;
