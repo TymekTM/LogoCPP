@@ -182,6 +182,11 @@ public:
     bool topLevelCompiled = false;
     void compileTopLevel(const std::string& instructionSet);
 
+    // JIT: native entry point for the top-level program
+    // (void fn(Turtle*, double* vars, double* args)), null when not compiled
+    void* jitEntry = nullptr;
+    bool jitCompile(); // one-shot; keeps bytecode executor as fallback
+
     // Slot-based variable storage (cache-line aligned for hot path access)
     alignas(64) double varSlots[MAX_VARS] = {};
     std::unordered_map<std::string, int> varNameToSlot;

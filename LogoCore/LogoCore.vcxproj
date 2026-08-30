@@ -151,6 +151,7 @@
     <ClInclude Include="LogoCore.h" />
     <ClInclude Include="ParsingHelper.h" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="Jit.h" />
     <ClInclude Include="Tokenizer.h" />
     <ClInclude Include="Turtle.h" />
   </ItemGroup>
@@ -166,6 +167,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="Jit.cpp" />
     <ClCompile Include="Tokenizer.cpp" />
     <ClCompile Include="Turtle.cpp" />
   </ItemGroup>

@@ -22,13 +22,16 @@ public:
     int getPosX() const { return posX; }
     int getPosY() const { return posY; }
 
-private:
-    Canvas& canvas;
-    char pen;
+    // Hot state, accessed directly by the JIT-generated machine code
+    // (offsets baked in via offsetof in Jit.cpp). Do not reorder.
     int posX;
     int posY;
     int angle = 0;
     bool penDown = true;
+
+private:
+    Canvas& canvas;
+    char pen;
     
     // Precomputed sin/cos tables (x8192 fixed point, power-of-2 for fast shift)
     static constexpr int TABLE_SIZE = 3600; // 0.1 degree precision

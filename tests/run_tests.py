@@ -32,6 +32,7 @@ CASE_SIZES = {
     "condition_ops": 50,
     "multi_function": 50,
     "diagonals": 50,
+    "turn_var": 40,
 }
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -40,15 +41,13 @@ EXPECTED_DIR = os.path.join(ROOT, "expected")
 DEFAULT_EXE = os.path.join(ROOT, "..", "x64", "Release", "LogoCPP.exe")
 
 
-def run_case(exe, name, out_path):
+def run_case(exe, name, out_path, use_jit=False):
     size = CASE_SIZES[name]
     input_file = os.path.join(CASES_DIR, name + ".logo")
-    result = subprocess.run(
-        [exe, "-i", input_file, "-o", out_path, "-s", str(size)],
-        capture_output=True,
-        text=True,
-    )
-    return result
+    cmd = [exe, "-i", input_file, "-o", out_path, "-s", str(size)]
+    if use_jit:
+        cmd.append("-j")
+    return subprocess.run(cmd, capture_output=True, text=True)
 
 
 def main():
@@ -73,54 +72,59 @@ def main():
     os.makedirs(EXPECTED_DIR, exist_ok=True)
     passed, failed = 0, 0
 
+    # Each case must produce identical output through both execution paths:
+    # the bytecode interpreter and the native JIT.
     for name in names:
-        golden_path = os.path.join(EXPECTED_DIR, name + ".txt")
-        with tempfile.NamedTemporaryFile(suffix=".txt", delete=False) as tmp:
-            out_path = tmp.name
-        try:
-            result = run_case(exe, name, out_path)
-            if result.returncode != 0:
-                print(f"FAIL {name}: exit code {result.returncode}")
-                failed += 1
-                continue
-            with open(out_path, "rb") as f:
-                actual = f.read()
-            if args.update:
-                with open(golden_path, "wb") as f:
-                    f.write(actual)
-                print(f"UPDATED {name} ({len(actual)} bytes)")
-                continue
-            if not os.path.exists(golden_path):
-                print(f"FAIL {name}: no golden file (run with --update first)")
-                failed += 1
-                continue
-            with open(golden_path, "rb") as f:
-                expected = f.read()
-            if actual == expected:
-                print(f"PASS {name}")
-                passed += 1
-            else:
-                # Locate first differing line for a helpful message
-                exp_lines = expected.splitlines(keepends=True)
-                act_lines = actual.splitlines(keepends=True)
-                for i, (e, a) in enumerate(zip(exp_lines, act_lines)):
-                    if e != a:
-                        print(f"FAIL {name}: first diff at line {i + 1}")
-                        print(f"  expected: {e!r}")
-                        print(f"  actual:   {a!r}")
-                        break
+        for mode, use_jit in (("interp", False), ("jit", True)):
+            label = f"{name}[{mode}]"
+            golden_path = os.path.join(EXPECTED_DIR, name + ".txt")
+            with tempfile.NamedTemporaryFile(suffix=".txt", delete=False) as tmp:
+                out_path = tmp.name
+            try:
+                result = run_case(exe, name, out_path, use_jit)
+                if result.returncode != 0:
+                    print(f"FAIL {label}: exit code {result.returncode}")
+                    failed += 1
+                    continue
+                with open(out_path, "rb") as f:
+                    actual = f.read()
+                if args.update:
+                    if mode == "interp":
+                        with open(golden_path, "wb") as f:
+                            f.write(actual)
+                        print(f"UPDATED {name} ({len(actual)} bytes)")
+                    continue
+                if not os.path.exists(golden_path):
+                    print(f"FAIL {label}: no golden file (run with --update first)")
+                    failed += 1
+                    continue
+                with open(golden_path, "rb") as f:
+                    expected = f.read()
+                if actual == expected:
+                    print(f"PASS {label}")
+                    passed += 1
                 else:
-                    print(f"FAIL {name}: length differs "
-                          f"(expected {len(expected)}, got {len(actual)})")
-                failed += 1
-        finally:
-            os.unlink(out_path)
+                    # Locate first differing line for a helpful message
+                    exp_lines = expected.splitlines(keepends=True)
+                    act_lines = actual.splitlines(keepends=True)
+                    for i, (e, a) in enumerate(zip(exp_lines, act_lines)):
+                        if e != a:
+                            print(f"FAIL {label}: first diff at line {i + 1}")
+                            print(f"  expected: {e!r}")
+                            print(f"  actual:   {a!r}")
+                            break
+                    else:
+                        print(f"FAIL {label}: length differs "
+                              f"(expected {len(expected)}, got {len(actual)})")
+                    failed += 1
+            finally:
+                os.unlink(out_path)
 
     if args.update:
         print(f"\n{len(names)} golden files written.")
         return 0
 
-    print(f"\n{passed} passed, {failed} failed, {len(names)} total")
+    print(f"\n{passed} passed, {failed} failed, {len(names) * 2} total")
     return 0 if failed == 0 else 1
 
 

@@ -11,6 +11,7 @@ void printUsage() {
     std::cout << "  -o  output file with path traced out" << std::endl;
     std::cout << "  -s  canvas/board size (ex. 100)" << std::endl;
     std::cout << "  -t  trim output to minimal bounding box" << std::endl;
+    std::cout << "  -j  run via native JIT (compile Logo to machine code)" << std::endl;
     std::cout << "  -b  benchmark mode - run N iterations and print timing" << std::endl;
 }
 
@@ -19,6 +20,7 @@ int main(int argc, char* argv[]) {
     std::string outputFile;
     int boardSize = 50;
     bool trimOutput = false;
+    bool useJit = false;
     int benchmarkIterations = 0;
 
     for (int i = 1; i < argc; i++) {
@@ -30,6 +32,7 @@ int main(int argc, char* argv[]) {
             catch (...) { std::cerr << "Error: Invalid canvas size" << std::endl; return 1; }
         }
         else if (arg == "-t") trimOutput = true;
+        else if (arg == "-j") useJit = true;
         else if (arg == "-b" && i + 1 < argc) {
             try { benchmarkIterations = std::stoi(argv[++i]); }
             catch (...) { std::cerr << "Error: Invalid benchmark iterations" << std::endl; return 1; }
@@ -61,7 +64,9 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
-    auto result = TurtleInstructions(logoCode, boardSize, boardSize, '*', trimOutput);
+    auto result = useJit
+        ? TurtleInstructionsJit(logoCode, boardSize, boardSize, '*', trimOutput)
+        : TurtleInstructions(logoCode, boardSize, boardSize, '*', trimOutput);
     if (!FileHandler::WriteOutputFile(outputFile, result)) {
         std::cerr << "Error: Failed to save output file" << std::endl;
         return 1;

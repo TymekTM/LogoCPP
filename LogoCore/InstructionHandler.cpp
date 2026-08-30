@@ -50,6 +50,12 @@ void Instruction::Execute(const std::string& instructionSet) {
 }
 
 void Instruction::ExecuteTopLevel() {
+    if (jitEntry) {
+        // Native entry: void fn(Turtle* rcx, double* rdx vars, double* r8 args)
+        typedef void(*JitFn)(Turtle*, double*, double*);
+        reinterpret_cast<JitFn>(jitEntry)(turtlePtr, varSlots, nullptr);
+        return;
+    }
     executeCompiledRaw(compiledTopLevel.data(), static_cast<int>(compiledTopLevel.size()));
 }
 

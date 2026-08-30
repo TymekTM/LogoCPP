@@ -7,6 +7,11 @@
 // Original API (returns grid as vector<vector<char>>)
 std::vector<std::vector<char>> TurtleInstructions(const std::string& instructionSet, int width = 25, int height = 25, char pen = '*', bool trimOutput = false);
 
+// JIT API: registers definitions on a scratch canvas, then runs the compiled
+// native code on a fresh canvas (falls back to the bytecode executor when the
+// JIT is unavailable, e.g. LOGOCPP_NO_JIT=1 or non-x64 hosts)
+std::vector<std::vector<char>> TurtleInstructionsJit(const std::string& instructionSet, int width = 25, int height = 25, char pen = '*', bool trimOutput = false);
+
 // Fast benchmark API (skips grid copy, caches compilation after first call)
 void TurtleInstructionsBenchmark(const std::string& instructionSet, int width = 25, int height = 25, char pen = '*', bool trimOutput = false);
 

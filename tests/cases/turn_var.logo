@@ -1,0 +1,8 @@
+a = 3;
+pd();
+right(a * 30);
+forward(10);
+left(a * 10);
+forward(10);
+right(a + 15);
+forward(5);

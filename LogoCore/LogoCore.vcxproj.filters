@@ -33,6 +33,9 @@
     <ClInclude Include="InstructionHandler.h">
       <Filter>Pliki nagłówkowe</Filter>
     </ClInclude>
+    <ClInclude Include="Jit.h">
+      <Filter>Pliki nagłówkowe</Filter>
+    </ClInclude>
     <ClInclude Include="Tokenizer.h">
       <Filter>Pliki nagłówkowe</Filter>
     </ClInclude>
@@ -57,6 +60,9 @@
       <Filter>Pliki źródłowe</Filter>
     </ClCompile>
     <ClCompile Include="InstructionHandler.cpp">
+      <Filter>Pliki źródłowe</Filter>
+    </ClCompile>
+    <ClCompile Include="Jit.cpp">
       <Filter>Pliki źródłowe</Filter>
     </ClCompile>
     <ClCompile Include="Tokenizer.cpp">
