@@ -1,0 +1,12 @@
+def side(n){
+    forward(n);
+    right(90);
+};
+def square(n){
+    side(n);
+    side(n);
+    side(n);
+    side(n);
+};
+square(12);
+square(6);

@@ -1,0 +1,8 @@
+def star(size, count){
+    if (count > 0){
+        forward(size);
+        right(144);
+        star(size, count - 1);
+    };
+};
+star(15, 5);

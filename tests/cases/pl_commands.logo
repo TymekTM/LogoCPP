@@ -1,0 +1,9 @@
+przod(10);
+prawo(90);
+przod(10);
+prawo(90);
+przod(10);
+prawo(90);
+przod(10);
+tyl(5);
+lewo(45);

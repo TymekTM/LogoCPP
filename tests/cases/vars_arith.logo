@@ -1,0 +1,8 @@
+x = 5;
+y = x * 2;
+z = x + y;
+forward(z);
+right(90);
+forward(x + y - 3);
+a = z - 1;
+forward(a * 1);

@@ -1,0 +1,8 @@
+def spiral(size){
+    if (size < 18){
+        forward(size);
+        right(90);
+        spiral(size + 1);
+    };
+};
+spiral(1);

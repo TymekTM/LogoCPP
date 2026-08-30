@@ -1,0 +1,23 @@
+def koch(size, depth){
+    if (depth > 0){
+        koch(size * 0.3333, depth - 1);
+        left(60);
+        koch(size * 0.3333, depth - 1);
+        right(120);
+        koch(size * 0.3333, depth - 1);
+        left(60);
+        koch(size * 0.3333, depth - 1);
+    };
+    if (depth <= 0){
+        forward(size);
+    };
+};
+def flake(size, depth){
+    koch(size, depth);
+    right(120);
+    koch(size, depth);
+    right(120);
+    koch(size, depth);
+    right(120);
+};
+flake(27, 3);

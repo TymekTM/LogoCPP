@@ -1,0 +1,12 @@
+def tree(x, n){
+    if (n > 0){
+        forward(x);
+        left(45);
+        tree(x * 0.75, n - 1);
+        right(90);
+        tree(x * 0.75, n - 1);
+        left(45);
+        backward(x);
+    };
+};
+tree(20, 8);

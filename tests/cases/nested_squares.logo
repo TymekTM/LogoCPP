@@ -1,0 +1,20 @@
+def squares(size){
+    if (size > 2){
+        forward(size);
+        right(90);
+        forward(size);
+        right(90);
+        forward(size);
+        right(90);
+        forward(size);
+        right(90);
+        penup();
+        forward(1);
+        right(90);
+        forward(1);
+        left(90);
+        pendown();
+        squares(size - 4);
+    };
+};
+squares(20);

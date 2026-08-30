@@ -1,0 +1,10 @@
+def dots(n){
+    if (n > 0){
+        pendown();
+        forward(1);
+        penup();
+        forward(2);
+        dots(n - 1);
+    };
+};
+dots(10);

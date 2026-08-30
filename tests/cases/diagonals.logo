@@ -1,0 +1,6 @@
+right(45);
+forward(10);
+left(90);
+backward(10);
+right(135);
+forward(7);
