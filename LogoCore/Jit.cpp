@@ -16,11 +16,11 @@
 #define LOGOCPP_JIT_AVAILABLE 0
 #endif
 
-// C++ helpers called from JIT code. Their addresses are cached in r14/r15
-// by the top-level prologue; calls from JIT code are plain `call r14`.
+// C++ helper called from JIT code for the long-line (Bresenham) case of a
+// move. The trig, rounding and sub-pixel stores are emitted inline by
+// emitMove; only real line drawing goes through here.
 extern "C" {
-    __declspec(noinline) void jitForward(Turtle* t, int d) { t->Forward(d); }
-    __declspec(noinline) void jitBackward(Turtle* t, int d) { t->Backward(d); }
+    __declspec(noinline) void jitMoveDraw(Turtle* t, int nx, int ny) { t->MoveTo(nx, ny); }
 }
 
 #if LOGOCPP_JIT_AVAILABLE
@@ -159,8 +159,6 @@ public:
     // --- control flow ---
     void jmp(Label& L) { emit8(0xE9); useLabel(L); }
     void jcc(uint8_t op, Label& L) { emit8(0x0F); emit8(0x80 | op); useLabel(L); }
-    void callR14() { emit8(0x41); emit8(0xFF); emit8(0xD6); }
-    void callR15() { emit8(0x41); emit8(0xFF); emit8(0xD7); }
     void ret() { emit8(0xC3); }
 
     // --- integer ops on edx (angle) ---
@@ -177,6 +175,61 @@ public:
         if (-128 <= v && v <= 127) { emit8(0x83); emit8(0xEA); emit8((uint8_t)v); }
         else { emit8(0x81); emit8(0xEA); emit32((uint32_t)v); }
     }
+
+    // --- inline move (Forward/Backward) support ---
+    // eax-side arithmetic
+    void movEaxDwordRsi(int off) { emit8(0x8B); emit8(0x46); emit8((uint8_t)off); }   // eax = [rsi+off]
+    void addEaxImm(int v) { emit8(0x05); emit32((uint32_t)v); }                       // eax += imm32
+    void subEaxImm(int v) { emit8(0x2D); emit32((uint32_t)v); }                       // eax -= imm32
+    void cmpEaxImm(int v) { emit8(0x3D); emit32((uint32_t)v); }                       // cmp eax, imm32
+    void cmpEaxImm8(int v) { emit8(0x83); emit8(0xF8); emit8((uint8_t)v); }           // cmp eax, imm8
+    void imulEaxEaxImm8(int v) { emit8(0x6B); emit8(0xC0); emit8((uint8_t)v); }       // eax *= imm8
+    // trig tables and fixed-point products
+    void movR10dR14Eax() { emit8(0x45); emit8(0x8B); emit8(0x14); emit8(0x86); }      // r10d = [r14+rax*4]
+    void movR11dR15Eax() { emit8(0x45); emit8(0x8B); emit8(0x1C); emit8(0x87); }      // r11d = [r15+rax*4]
+    void imulR10dEdx() { emit8(0x44); emit8(0x0F); emit8(0xAF); emit8(0xD2); }        // r10d *= edx
+    void imulR11dEdx() { emit8(0x44); emit8(0x0F); emit8(0xAF); emit8(0xDA); }        // r11d *= edx
+    // branchless roundShift temps
+    void movR9dR10d() { emit8(0x45); emit8(0x89); emit8(0xD1); }                      // r9d = r10d
+    void movR9dR11d() { emit8(0x45); emit8(0x89); emit8(0xD9); }                      // r9d = r11d
+    void sarR9dImm(int v) { emit8(0x41); emit8(0xC1); emit8(0xF9); emit8((uint8_t)v); }
+    void sarR10dImm(int v) { emit8(0x41); emit8(0xC1); emit8(0xFA); emit8((uint8_t)v); }
+    void sarR11dImm(int v) { emit8(0x41); emit8(0xC1); emit8(0xFB); emit8((uint8_t)v); }
+    void addR10dImm(int v) { emit8(0x41); emit8(0x81); emit8(0xC2); emit32((uint32_t)v); }
+    void addR11dImm(int v) { emit8(0x41); emit8(0x81); emit8(0xC3); emit32((uint32_t)v); }
+    void addR10dR9d() { emit8(0x45); emit8(0x01); emit8(0xCA); }                      // r10d += r9d
+    void addR11dR9d() { emit8(0x45); emit8(0x01); emit8(0xCB); }                      // r11d += r9d
+    // newX / newY
+    void movR8dDwordRsi(int off) { emit8(0x44); emit8(0x8B); emit8(0x46); emit8((uint8_t)off); }  // r8d = [rsi+off]
+    void movR9dDwordRsi(int off) { emit8(0x44); emit8(0x8B); emit8(0x4E); emit8((uint8_t)off); }  // r9d = [rsi+off]
+    void addR8dR10d() { emit8(0x45); emit8(0x01); emit8(0xD0); }                      // r8d += r10d
+    void addR9dR11d() { emit8(0x45); emit8(0x01); emit8(0xD9); }                      // r9d += r11d
+    void movDwordRsiR8(int off) { emit8(0x44); emit8(0x89); emit8(0x46); emit8((uint8_t)off); }   // [rsi+off] = r8d
+    void movDwordRsiR9(int off) { emit8(0x44); emit8(0x89); emit8(0x4E); emit8((uint8_t)off); }   // [rsi+off] = r9d
+    // pen / sub-pixel window
+    void cmpByteRsiImm(int off, int imm) { emit8(0x80); emit8(0x7E); emit8((uint8_t)off); emit8((uint8_t)imm); }
+    void leaEaxR10d1() { emit8(0x41); emit8(0x8D); emit8(0x42); emit8(0x01); }        // eax = r10d + 1
+    void leaEaxR11d1() { emit8(0x41); emit8(0x8D); emit8(0x43); emit8(0x01); }        // eax = r11d + 1
+    // canvas-relative loads and stores
+    void movRaxQwordRsi(int off) { emit8(0x48); emit8(0x8B); emit8(0x46); emit8((uint8_t)off); } // rax = [rsi+off]
+    void movRaxQwordRax() { emit8(0x48); emit8(0x8B); emit8(0x00); }                   // rax = [rax] (canvas -> grid)
+    void movEdxDwordRax(int off) { emit8(0x8B); emit8(0x50); emit8((uint8_t)off); }   // edx = [rax+off]
+    void movEcxDwordRax(int off) { emit8(0x8B); emit8(0x48); emit8((uint8_t)off); }   // ecx = [rax+off]
+    void movR10dDwordRax(int off) { emit8(0x44); emit8(0x8B); emit8(0x50); emit8((uint8_t)off); } // r10d = [rax+off]
+    void addEdxDwordRsi0() { emit8(0x03); emit8(0x16); }                              // edx += [rsi]
+    void addEcxDwordRsi4() { emit8(0x03); emit8(0x4E); emit8(0x04); }                 // ecx += [rsi+4]
+    void addEdxR8d() { emit8(0x44); emit8(0x01); emit8(0xC2); }                       // edx += r8d
+    void addEcxR9d() { emit8(0x44); emit8(0x01); emit8(0xC9); }                       // ecx += r9d
+    void cmpEdxDwordRax(int off) { emit8(0x3B); emit8(0x50); emit8((uint8_t)off); }   // cmp edx, [rax+off]
+    void cmpEcxDwordRax(int off) { emit8(0x3B); emit8(0x48); emit8((uint8_t)off); }   // cmp ecx, [rax+off]
+    void imulEcxEcxR10d() { emit8(0x41); emit8(0x0F); emit8(0xAF); emit8(0xCA); }     // ecx *= r10d
+    void addEcxEdx() { emit8(0x03); emit8(0xCA); }                                    // ecx += edx
+    void movzxR11dByteRsi(int off) { emit8(0x44); emit8(0x0F); emit8(0xB6); emit8(0x5E); emit8((uint8_t)off); } // r11d = zext byte [rsi+off]
+    void movByteRaxRcxR11d() { emit8(0x44); emit8(0x88); emit8(0x1C); emit8(0x08); }  // [rax+rcx] = r11b
+    // long-line fallback call
+    void movEdxR8d() { emit8(0x44); emit8(0x89); emit8(0xC2); }                       // edx = r8d
+    void movR8dR9d() { emit8(0x45); emit8(0x89); emit8(0xC8); }                       // r8d = r9d
+    void callRax() { emit8(0xFF); emit8(0xD0); }
     void testEdxEdx() { emit8(0x85); emit8(0xD2); }
     void cmpEdxImm(int v) { emit8(0x81); emit8(0xFA); emit32((uint32_t)v); }
     void storeByteRsi(int off, uint8_t v) {
@@ -213,7 +266,7 @@ struct FnCtx {
 //   rbp = frame base (params addressed [rbp+off], stable across rsp shifts)
 //   rbx = global varSlots base
 //   rsi = Turtle*
-//   r14 = &jitForward, r15 = &jitBackward (set by top-level prologue)
+//   r14 = &Turtle::cosTable, r15 = &Turtle::sinTable (set by top-level prologue)
 class CodeGen {
 public:
     Emitter& e;
@@ -246,11 +299,11 @@ public:
         e.movRbxRdx();                                // rbx = vars
         e.movRsiRcx();                                // rsi = turtle
         if (isTopLevel) {
-            // mov r14, &jitForward ; mov r15, &jitBackward
+            // mov r14, &Turtle::cosTable ; mov r15, &Turtle::sinTable
             e.emit8(0x49); e.emit8(0xBE);
-            e.emit64(reinterpret_cast<uint64_t>(&jitForward));
+            e.emit64(reinterpret_cast<uint64_t>(&Turtle::cosTable));
             e.emit8(0x49); e.emit8(0xBF);
-            e.emit64(reinterpret_cast<uint64_t>(&jitBackward));
+            e.emit64(reinterpret_cast<uint64_t>(&Turtle::sinTable));
         }
         for (int i = 0; i < np; ++i) {
             // Param slots live above the 32B home space at the bottom of the
@@ -369,13 +422,9 @@ public:
     void emitInstr(const CInstr& instr, const FnCtx& ctx) {
         switch (instr.type) {
             case CommandType::Forward:
-            case CommandType::Backward: {
-                emitExprInt(instr.arg, ctx);
-                e.movRcxRsi();                  // home space is pre-reserved at [rsp)
-                if (instr.type == CommandType::Forward) e.callR14();
-                else e.callR15();
+            case CommandType::Backward:
+                emitMove(instr.type == CommandType::Forward, ctx, instr);
                 break;
-            }
             case CommandType::Left:
             case CommandType::Right:
                 emitTurn(instr.type == CommandType::Right, ctx, instr);
@@ -468,9 +517,118 @@ public:
         if (guarded) e.bind(skip);
     }
 
+    // Inline copy of Turtle::Forward/Backward. Trig tables come from
+    // r14/r15, rounding is the branchless roundShift, and the sub-pixel
+    // pixel stores are emitted inline; only real (multi-pixel) lines call
+    // jitMoveDraw. Must stay bit-exact with Turtle::MoveTo.
+    void emitMove(bool isForward, const FnCtx& ctx, const CInstr& instr) {
+        static_assert(offsetof(Turtle, posX) == 0);
+        static_assert(offsetof(Turtle, posY) == 4);
+        static_assert(offsetof(Turtle, angle) == 8);
+        static_assert(offsetof(Turtle, penDown) == 12);
+        static_assert(offsetof(Turtle, pen) == 24);
+        static_assert(sizeof(Turtle) == 32);
+        // offsetof is unreliable for the Canvas& reference member on MSVC,
+        // but the asserts above pin the layout: penDown ends at 13 and the
+        // 8-byte-aligned canvas reference fills [16, 24), so canvas == 16.
+        // (emitMove loads it with movRaxQwordRsi(16).)
+        static_assert(offsetof(Canvas, grid) == 0);
+        static_assert(offsetof(Canvas, gridWidth) == 8);
+        static_assert(offsetof(Canvas, gridHeight) == 12);
+        static_assert(offsetof(Canvas, offsetX) == 16);
+        static_assert(offsetof(Canvas, offsetY) == 20);
+
+        emitExprInt(instr.arg, ctx);                  // edx = distance
+        Label done;
+        e.testEdxEdx();
+        e.jcc(JLE, done);                             // if (distance <= 0) return
+
+        e.movEaxDwordRsi(static_cast<int>(offsetof(Turtle, angle)));
+        if (!isForward) {
+            e.addEaxImm(180);
+            Label nosub;
+            e.cmpEaxImm(360);
+            e.jcc(JL, nosub);
+            e.subEaxImm(360);
+            e.bind(nosub);
+        }
+        e.imulEaxEaxImm8(10);                         // idx = angle * 10
+
+        e.movR10dR14Eax();                            // r10d = cosTable[idx]
+        e.movR11dR15Eax();                            // r11d = sinTable[idx]
+        e.imulR10dEdx();
+        e.imulR11dEdx();
+
+        // roundShift(v) = (v + HALF + (v >> 31)) >> SHIFT, for both axes.
+        e.movR9dR10d();  e.sarR9dImm(31);
+        e.addR10dImm(Turtle::TRIG_HALF); e.addR10dR9d(); e.sarR10dImm(Turtle::TRIG_SHIFT);
+        e.movR8dDwordRsi(0); e.addR8dR10d();          // r8d = newX
+        e.movR9dR11d();  e.sarR9dImm(31);
+        e.addR11dImm(Turtle::TRIG_HALF); e.addR11dR9d(); e.sarR11dImm(Turtle::TRIG_SHIFT);
+        e.movR9dDwordRsi(4); e.addR9dR11d();          // r9d = newY
+
+        // Turtle::MoveTo: pen-up moves only update the position.
+        Label storePos;
+        e.cmpByteRsiImm(12, 0);
+        e.jcc(JE, storePos);
+
+        // Sub-pixel window: (unsigned)(adx+1) <= 2 && (unsigned)(ady+1) <= 2
+        Label longPath;
+        e.leaEaxR10d1(); e.cmpEaxImm8(2); e.jcc(JA, longPath);
+        e.leaEaxR11d1(); e.cmpEaxImm8(2); e.jcc(JA, longPath);
+
+        // Inline pixel stores (bounds-checked, no canvas expansion).
+        // Storing the endpoint pixel unconditionally is identical to the
+        // adx|ady test in MoveTo: for a zero move it rewrites the same
+        // grid cell with the same pen character. The grid offset is
+        // computed in ecx because writing eax would clear the upper half
+        // of rax (the grid pointer).
+        e.movRaxQwordRsi(16);                         // rax = &canvas
+        e.movR10dDwordRax(8);                         // r10d = gridWidth
+        e.movzxR11dByteRsi(24);                       // r11d = pen char
+
+        e.movEdxDwordRax(16); e.addEdxDwordRsi0();    // edx = posX + offsetX
+        e.movEcxDwordRax(20); e.addEcxDwordRsi4();    // ecx = posY + offsetY
+        Label skip0;
+        e.cmpEdxDwordRax(8);  e.jcc(JAE, skip0);      // ix0 >= gridWidth
+        e.cmpEcxDwordRax(12); e.jcc(JAE, skip0);      // iy0 >= gridHeight
+        e.movRaxQwordRax();                           // rax = canvas->grid
+        e.imulEcxEcxR10d(); e.addEcxEdx();            // ecx = iy0 * gw + ix0
+        e.movByteRaxRcxR11d();
+        e.bind(skip0);
+
+        e.movRaxQwordRsi(16);                         // rax = &canvas
+        e.movEdxDwordRax(16); e.addEdxR8d();          // edx = newX + offsetX
+        e.movEcxDwordRax(20); e.addEcxR9d();          // ecx = newY + offsetY
+        Label skip1;
+        e.cmpEdxDwordRax(8);  e.jcc(JAE, skip1);
+        e.cmpEcxDwordRax(12); e.jcc(JAE, skip1);
+        e.movRaxQwordRax();                           // rax = canvas->grid
+        e.imulEcxEcxR10d(); e.addEcxEdx();            // ecx = iy1 * gw + ix1
+        e.movByteRaxRcxR11d();
+        e.bind(skip1);
+        e.jmp(storePos);
+
+        // Multi-pixel line: jitMoveDraw(turtle, newX, newY) draws and
+        // stores the position; home space at [rsp) is pre-reserved.
+        // It also clobbers r8-r11 (volatile), so this branch must skip
+        // the position stores below.
+        e.bind(longPath);
+        e.movEdxR8d();
+        e.movR8dR9d();
+        e.movRcxRsi();
+        e.movRaxImm(reinterpret_cast<uint64_t>(&jitMoveDraw));
+        e.callRax();
+        e.jmp(done);
+
+        e.bind(storePos);
+        e.movDwordRsiR8(0);                           // posX = newX
+        e.movDwordRsiR9(4);                           // posY = newY
+        e.bind(done);
+    }
+
     // Emits the turn logic; shared by Left/Right after arg eval (edx).
-    void emitTurn(bool isRight, const FnCtx& ctx, const CInstr& instr) {
-        const int angleOff = static_cast<int>(offsetof(Turtle, angle));
+    void emitTurn(bool isRight, const FnCtx& ctx, const CInstr& instr) {        const int angleOff = static_cast<int>(offsetof(Turtle, angle));
         emitExprInt(instr.arg, ctx);            // result in edx (eax only
         e.movEaxEdx();                          //   reliable for literals)
         e.movEdxDwordRsi(angleOff);             // edx = turtle->angle

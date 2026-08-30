@@ -117,20 +117,10 @@ namespace {
     }
 }
 
-void Turtle::Forward(int distance) {
-    if (distance <= 0) return;
-
-    int idx = angle * 10;  // angle is already in [0, 360)
-
-    int cs = cosTable[idx];
-    int sn = sinTable[idx];
-
-    int newX = posX + roundShift(distance * cs);
-    int newY = posY + roundShift(distance * sn);
-    
+void Turtle::MoveTo(int nx, int ny) {
     if (penDown) {
-        int adx = newX - posX;
-        int ady = newY - posY;
+        int adx = nx - posX;
+        int ady = ny - posY;
         // Fast path: movement <= 1 pixel in each axis -> at most 2 pixels, skip Bresenham
         if ((unsigned)(adx + 1) <= 2u && (unsigned)(ady + 1) <= 2u) [[likely]] {
             const int ox = canvas.offsetX, oy = canvas.offsetY;
@@ -143,57 +133,41 @@ void Turtle::Forward(int distance) {
             if ((unsigned)ix0 < ugw && (unsigned)iy0 < ugh) [[likely]]
                 g[iy0 * gw + ix0] = p;
             if (adx | ady) { // not same pixel
-                int ix1 = newX + ox, iy1 = newY + oy;
+                int ix1 = nx + ox, iy1 = ny + oy;
                 if ((unsigned)ix1 < ugw && (unsigned)iy1 < ugh) [[likely]]
                     g[iy1 * gw + ix1] = p;
             }
         } else {
-            drawLine(posX, posY, newX, newY);
+            drawLine(posX, posY, nx, ny);
         }
     }
-    
-    posX = newX;
-    posY = newY;
+
+    posX = nx;
+    posY = ny;
+}
+
+void Turtle::Forward(int distance) {
+    if (distance <= 0) return;
+
+    int idx = angle * 10;  // angle is already in [0, 360)
+
+    int cs = cosTable[idx];
+    int sn = sinTable[idx];
+
+    MoveTo(posX + roundShift(distance * cs),
+           posY + roundShift(distance * sn));
 }
 
 void Turtle::Backward(int distance) {
     if (distance <= 0) return;
-    
+
     int a = angle + 180;
     if (a >= 360) a -= 360;  // angle was in [0,360), so a is in [180,540) -> just subtract 360 if needed
     int idx = a * 10;
-    
+
     int cs = cosTable[idx];
     int sn = sinTable[idx];
-    
-    int dx = distance * cs;
-    int dy = distance * sn;
-    int newX = posX + (dx >= 0 ? (dx + TRIG_HALF) >> TRIG_SHIFT : -(((-dx) + TRIG_HALF) >> TRIG_SHIFT));
-    int newY = posY + (dy >= 0 ? (dy + TRIG_HALF) >> TRIG_SHIFT : -(((-dy) + TRIG_HALF) >> TRIG_SHIFT));
-    
-    if (penDown) {
-        int adx = newX - posX;
-        int ady = newY - posY;
-        if ((unsigned)(adx + 1) <= 2u && (unsigned)(ady + 1) <= 2u) [[likely]] {
-            const int ox = canvas.offsetX, oy = canvas.offsetY;
-            const int gw = canvas.gridWidth;
-            const unsigned ugw = static_cast<unsigned>(gw);
-            const unsigned ugh = static_cast<unsigned>(canvas.gridHeight);
-            char* __restrict g = canvas.grid;
-            const char p = pen;
-            int ix0 = posX + ox, iy0 = posY + oy;
-            if ((unsigned)ix0 < ugw && (unsigned)iy0 < ugh) [[likely]]
-                g[iy0 * gw + ix0] = p;
-            if (adx | ady) {
-                int ix1 = newX + ox, iy1 = newY + oy;
-                if ((unsigned)ix1 < ugw && (unsigned)iy1 < ugh) [[likely]]
-                    g[iy1 * gw + ix1] = p;
-            }
-        } else {
-            drawLine(posX, posY, newX, newY);
-        }
-    }
-    
-    posX = newX;
-    posY = newY;
+
+    MoveTo(posX + roundShift(distance * cs),
+           posY + roundShift(distance * sn));
 }
