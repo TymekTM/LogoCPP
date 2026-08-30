@@ -231,9 +231,10 @@ public:
         for (int i = 0; i < MAX_VARS; ++i) ctx.frameSlot[i] = -1;
         int np = cf ? cf->nParams : 0;
 
-        // Frame: params + 32B shadow space for helper calls. Parity: entry
-        // rsp = 16n+8; five pushes bring it to 16n; frame is 16-aligned, so
-        // all interior calls stay 16-aligned.
+        // Frame layout, low to high: [rsp, rsp+0x20) is the callee home
+        // space for helper calls (no per-call subRsp needed), then the np
+        // parameter slots. Parity: entry rsp = 16n+8; five pushes bring it
+        // to 16n; frame is 16-aligned, so all interior calls stay 16-aligned.
         uint32_t frame = ((np * 8 + 0x20 + 15) & ~15u);
         e.emit8(0x55);                                // push rbp
         e.emit8(0x48); e.emit8(0x89); e.emit8(0xE5);  // mov rbp, rsp
@@ -252,10 +253,10 @@ public:
             e.emit64(reinterpret_cast<uint64_t>(&jitBackward));
         }
         for (int i = 0; i < np; ++i) {
-            // Local slots live in the subRsp frame: [rsp, rbp-32). Slot 0 sits
-            // at the top of that window, last param at the very bottom (== rsp).
+            // Param slots live above the 32B home space at the bottom of the
+            // subRsp frame: slot np-1 at [rsp+0x20], slot 0 at the top.
             // (Only 32 bytes of pushes are below rbp: rbx, rsi, r14, r15.)
-            int off = 8 * (np - 1 - i) - 32 - static_cast<int>(frame);
+            int off = 0x20 + 8 * (np - 1 - i) - 32 - static_cast<int>(frame);
             ctx.frameSlot[cf->paramSlotArr[i]] = off;
             if (i < 4) {
                 e.storeParamReg(off, i);              // [rbp+off] = xmm{i}
@@ -370,11 +371,9 @@ public:
             case CommandType::Forward:
             case CommandType::Backward: {
                 emitExprInt(instr.arg, ctx);
-                e.subRsp(0x20);                        // shadow space
-                e.movRcxRsi();
+                e.movRcxRsi();                  // home space is pre-reserved at [rsp)
                 if (instr.type == CommandType::Forward) e.callR14();
                 else e.callR15();
-                e.addRsp(0x20);
                 break;
             }
             case CommandType::Left:
@@ -414,6 +413,27 @@ public:
     void emitCall(const CompiledFunction* cf, const CInstr& instr, const FnCtx& ctx) {
         int np = cf->nParams;
         int na = instr.nCallArgs;
+        // Early exit: when the callee is a single If guarding its whole body
+        // with a param-vs-literal comparison, evaluate just that argument and
+        // skip the entire call when the condition is false. Recursive Logo
+        // patterns (trees, spirals) spend half their calls on guard-false
+        // leaves, so this removes both the call and the callee frame.
+        Label skip;
+        const bool guarded = cf->hasEarlyExit && cf->earlyExitArgIdx < na;
+        if (guarded) {
+            emitExpr(instr.callArgs[cf->earlyExitArgIdx], ctx);  // xmm0 = arg
+            e.movapsXY(1, 0);                                    // xmm1 = arg
+            e.loadConstRip(cf->earlyExitLiteral);                // xmm0 = literal
+            e.comisdXmm1Xmm0();
+            switch (cf->earlyExitOp) {                           // skip when NOT(op)
+                case CCondition::GT: e.jcc(JBE, skip); break;
+                case CCondition::LT: e.jcc(JAE, skip); break;
+                case CCondition::GE: e.jcc(JB, skip); break;
+                case CCondition::LE: e.jcc(JA, skip); break;
+                case CCondition::EQ: e.jcc(JNE, skip); break;
+                case CCondition::NE: e.jcc(JE, skip); break;
+            }
+        }
         if (np <= 4) {
             // Register convention: args in xmm0..xmm3. Evaluate into
             // xmm2..xmm5 first (emitExpr uses only xmm0/xmm1), then shuffle
@@ -445,6 +465,7 @@ public:
             e.emit32(0);
             e.addRsp(argArea);
         }
+        if (guarded) e.bind(skip);
     }
 
     // Emits the turn logic; shared by Left/Right after arg eval (edx).
