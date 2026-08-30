@@ -47,21 +47,42 @@ void Turtle::drawLineFast(int x0, int y0, int x1, int y1) {
     int sx = x0 < x1 ? 1 : -1;
     int sy = y0 < y1 ? 1 : -1;
     int err = dx + dy;
-    
+
     char* __restrict g = canvas.grid;
     const int gw = canvas.gridWidth;
     const int ox = canvas.offsetX;
     const int oy = canvas.offsetY;
     const char p = pen;
-    
+
     // Use row pointer for incremental updates (avoid multiply per pixel)
     char* __restrict row = g + (y0 + oy) * gw;
     const int rowDelta = sy * gw;
     int cx = x0 + ox;
-    
+
+    // Axis and diagonal lines skip Bresenham error tracking entirely.
+    // Logo scenes (trees, squares, stars) are dominated by these.
+    const int adx = dx, ady = -dy;
+    if (adx == 0) {                       // vertical
+        for (;;) { row[cx] = p; if (y0 == y1) break; y0 += sy; row += rowDelta; }
+        return;
+    }
+    if (ady == 0) {                       // horizontal
+        const int ex = x1 + ox;
+        for (;;) { row[cx] = p; if (cx == ex) break; cx += sx; }
+        return;
+    }
+    if (adx == ady) {                     // perfect diagonal
+        for (;;) {
+            row[cx] = p;
+            if (x0 == x1) break;
+            x0 += sx; cx += sx; row += rowDelta;
+        }
+        return;
+    }
+
     while (true) {
         row[cx] = p;
-        
+
         if (x0 == x1 && y0 == y1) break;
         int e2 = 2 * err;
         if (e2 >= dy) { err += dy; x0 += sx; cx += sx; }
@@ -88,19 +109,24 @@ void Turtle::drawLineSlow(int x0, int y0, int x1, int y1) {
 }
 
 // Forward and Backward implementations
+namespace {
+    // Branchless round-half-away-from-zero: for v >= 0 it is
+    // (v + HALF) >> SHIFT; for v < 0, -( (-v + HALF) >> SHIFT ).
+    inline int roundShift(int v) {
+        return (v + Turtle::TRIG_HALF + (v >> 31)) >> Turtle::TRIG_SHIFT;
+    }
+}
+
 void Turtle::Forward(int distance) {
     if (distance <= 0) return;
-    
+
     int idx = angle * 10;  // angle is already in [0, 360)
-    
+
     int cs = cosTable[idx];
     int sn = sinTable[idx];
-    
-    int dx = distance * cs;
-    int dy = distance * sn;
-    // Power-of-2 rounding: (val + HALF) >> SHIFT for positive, -((-val + HALF) >> SHIFT) for negative
-    int newX = posX + (dx >= 0 ? (dx + TRIG_HALF) >> TRIG_SHIFT : -(((-dx) + TRIG_HALF) >> TRIG_SHIFT));
-    int newY = posY + (dy >= 0 ? (dy + TRIG_HALF) >> TRIG_SHIFT : -(((-dy) + TRIG_HALF) >> TRIG_SHIFT));
+
+    int newX = posX + roundShift(distance * cs);
+    int newY = posY + roundShift(distance * sn);
     
     if (penDown) {
         int adx = newX - posX;

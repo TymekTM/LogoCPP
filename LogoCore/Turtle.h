@@ -29,15 +29,17 @@ public:
     int angle = 0;
     bool penDown = true;
 
+    // Fixed-point trig constants (x8192, power-of-2 for fast shifts)
+    static constexpr int TRIG_SHIFT = 13;                 // 2^13 = 8192
+    static constexpr int TRIG_SCALE = 1 << TRIG_SHIFT;    // 8192
+    static constexpr int TRIG_HALF = TRIG_SCALE >> 1;     // 4096
+
 private:
     Canvas& canvas;
     char pen;
-    
+
     // Precomputed sin/cos tables (x8192 fixed point, power-of-2 for fast shift)
     static constexpr int TABLE_SIZE = 3600; // 0.1 degree precision
-    static constexpr int TRIG_SHIFT = 13;   // 2^13 = 8192
-    static constexpr int TRIG_SCALE = 1 << TRIG_SHIFT;  // 8192
-    static constexpr int TRIG_HALF = TRIG_SCALE >> 1;    // 4096
     static int sinTable[TABLE_SIZE];
     static int cosTable[TABLE_SIZE];
     static bool tablesInitialized;
